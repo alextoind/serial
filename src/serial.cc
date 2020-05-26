@@ -10,12 +10,7 @@
 #endif
 
 #include "serial/serial.h"
-
-#ifdef _WIN32
-#include "serial/impl/win.h"
-#else
-#include "serial/impl/unix.h"
-#endif
+#include "serial/impl/impl.h"
 
 using std::invalid_argument;
 using std::min;
