@@ -61,145 +61,103 @@ using serial::IOException;
 
 #if !defined(_WIN32)
 class MillisecondTimer {
-public:
-  MillisecondTimer(const uint32_t millis);         
+ public:
+  MillisecondTimer(const uint32_t millis);
   int64_t remaining();
 
-private:
+ private:
   static timespec timespec_now();
   timespec expiry;
 };
 #endif
 
 class Serial::SerialImpl {
-public:
-  SerialImpl (const string &port,
-              unsigned long baudrate,
-              bytesize_t bytesize,
-              parity_t parity,
-              stopbits_t stopbits,
-              flowcontrol_t flowcontrol);
+ public:
+  SerialImpl(const string &port, unsigned long baudrate, bytesize_t bytesize, parity_t parity, stopbits_t stopbits,
+             flowcontrol_t flowcontrol);
 
-  virtual ~SerialImpl ();
+  virtual ~SerialImpl();
 
-  void
-  open ();
+  void open();
 
-  void
-  close ();
+  void close();
 
-  bool
-  isOpen () const;
+  bool isOpen() const;
 
-  size_t
-  available ();
+  size_t available();
 
-  bool
-  waitReadable (uint32_t timeout);
+  bool waitReadable(uint32_t timeout);
 
-  void
-  waitByteTimes (size_t count);
+  void waitByteTimes(size_t count);
 
-  size_t
-  read (uint8_t *buf, size_t size = 1);
+  size_t read(uint8_t *buf, size_t size = 1);
 
-  size_t
-  write (const uint8_t *data, size_t length);
+  size_t write(const uint8_t *data, size_t length);
 
-  void
-  flush ();
+  void flush();
 
-  void
-  flushInput ();
+  void flushInput();
 
-  void
-  flushOutput ();
+  void flushOutput();
 
-  void
-  sendBreak (int duration);
+  void sendBreak(int duration);
 
-  void
-  setBreak (bool level);
+  void setBreak(bool level);
 
-  void
-  setRTS (bool level);
+  void setRTS(bool level);
 
-  void
-  setDTR (bool level);
+  void setDTR(bool level);
 
-  bool
-  waitForChange ();
+  bool waitForChange();
 
-  bool
-  getCTS ();
+  bool getCTS();
 
-  bool
-  getDSR ();
+  bool getDSR();
 
-  bool
-  getRI ();
+  bool getRI();
 
-  bool
-  getCD ();
+  bool getCD();
 
-  void
-  setPort (const string &port);
+  void setPort(const string &port);
 
-  string
-  getPort () const;
+  string getPort() const;
 
-  void
-  setTimeout (Timeout &timeout);
+  void setTimeout(Timeout &timeout);
 
-  Timeout
-  getTimeout () const;
+  Timeout getTimeout() const;
 
-  void
-  setBaudrate (unsigned long baudrate);
+  void setBaudrate(unsigned long baudrate);
 
-  unsigned long
-  getBaudrate () const;
+  unsigned long getBaudrate() const;
 
-  void
-  setBytesize (bytesize_t bytesize);
+  void setBytesize(bytesize_t bytesize);
 
-  bytesize_t
-  getBytesize () const;
+  bytesize_t getBytesize() const;
 
-  void
-  setParity (parity_t parity);
+  void setParity(parity_t parity);
 
-  parity_t
-  getParity () const;
+  parity_t getParity() const;
 
-  void
-  setStopbits (stopbits_t stopbits);
+  void setStopbits(stopbits_t stopbits);
 
-  stopbits_t
-  getStopbits () const;
+  stopbits_t getStopbits() const;
 
-  void
-  setFlowcontrol (flowcontrol_t flowcontrol);
+  void setFlowcontrol(flowcontrol_t flowcontrol);
 
-  flowcontrol_t
-  getFlowcontrol () const;
+  flowcontrol_t getFlowcontrol() const;
 
-  void
-  readLock ();
+  void readLock();
 
-  void
-  readUnlock ();
+  void readUnlock();
 
-  void
-  writeLock ();
+  void writeLock();
 
-  void
-  writeUnlock ();
+  void writeUnlock();
 
-protected:
-  void reconfigurePort ();
+ protected:
+  void reconfigurePort();
 
-private:
+ private:
 #if !defined(_WIN32)
   string port_;               // Path to the file descriptor
   int fd_;                    // The current file descriptor
@@ -234,7 +192,6 @@ private:
   HANDLE write_mutex;
 #endif
 };
-
 }  // namespace serial
 
 #endif  // SERIAL_IMPL_H
