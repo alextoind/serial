@@ -1,78 +1,65 @@
-cmake_minimum_required(VERSION 2.8.3)
-project(serial)
-
-# Find catkin
-find_package(catkin REQUIRED)
+cmake_minimum_required(VERSION 3.5.1 FATAL_ERROR)
+project(Serial VERSION 2.0.0 LANGUAGES CXX)
 
 if(APPLE)
-    find_library(IOKIT_LIBRARY IOKit)
-    find_library(FOUNDATION_LIBRARY Foundation)
-endif()
-
-if(UNIX AND NOT APPLE)
-    # If Linux, add rt and pthread
-    set(rt_LIBRARIES rt)
-    set(pthread_LIBRARIES pthread)
-    catkin_package(
-        LIBRARIES ${PROJECT_NAME}
-        INCLUDE_DIRS include
-        DEPENDS rt pthread
-    )
+  #TODO: check if both are required and if find_package instead of find_library works
+  find_package(IOKit REQUIRED)
+  find_package(Foundation REQUIRED)
+elseif(UNIX)
+  #find_package(rt REQUIRED)  #FIXME: not as package or moudle
+  find_package(Threads REQUIRED)
+elseif(WIN32)
+  #TODO: check if it is required and if find_package works
+  find_package(setupapi REQUIRED)
 else()
-    # Otherwise normal call
-    catkin_package(
-        LIBRARIES ${PROJECT_NAME}
-        INCLUDE_DIRS include
-    )
+  message(FATAL_ERROR "Not supported platform.")
 endif()
 
-## Include headers
-include_directories(include)
-
-## Sources
-set(serial_SRCS
-    src/serial.cc
+add_library(Serial SHARED
+  src/serial.cc
+)
+target_include_directories(Serial PUBLIC
+  $<BUILD_INTERFACE:${Serial_BINARY_DIR}/include>
+  $<BUILD_INTERFACE:${Serial_SOURCE_DIR}/include>
+  $<INSTALL_INTERFACE:include>
 )
 if(APPLE)
-    # If OSX
-    list(APPEND serial_SRCS src/impl/impl_unix.cc)
-    list(APPEND serial_SRCS src/impl/list_ports/list_ports_osx.cc)
+  target_sources(Serial PRIVATE
+    src/impl/impl_unix.cc
+    src/impl/list_ports/list_ports_osx.cc
+  )
+  target_link_libraries(Serial PRIVATE
+    IOKit
+    Foundation
+  )
 elseif(UNIX)
-    # If unix
-    list(APPEND serial_SRCS src/impl/impl_unix.cc)
-    list(APPEND serial_SRCS src/impl/list_ports/list_ports_linux.cc)
-else()
-    # If windows
-    list(APPEND serial_SRCS src/impl/impl_win.cc)
-    list(APPEND serial_SRCS src/impl/list_ports/list_ports_win.cc)
+  target_sources(Serial PRIVATE
+    src/impl/impl_unix.cc
+    src/impl/list_ports/list_ports_linux.cc
+  )
+#TODO: seems no longer required
+#  target_link_libraries(Serial PRIVATE
+#    rt
+#    Threads::Threads
+#  )
+else()  # already asserted WIN32 during find_package block
+  target_sources(Serial PRIVATE
+    src/impl/impl_win.cc
+    src/impl/list_ports/list_ports_win.cc
+  )
+  target_link_libraries(Serial PRIVATE
+    setupapi
+  )
 endif()
 
-## Add serial library
-add_library(${PROJECT_NAME} ${serial_SRCS})
-if(APPLE)
-    target_link_libraries(${PROJECT_NAME} ${FOUNDATION_LIBRARY} ${IOKIT_LIBRARY})
-elseif(UNIX)
-    target_link_libraries(${PROJECT_NAME} rt pthread)
-else()
-    target_link_libraries(${PROJECT_NAME} setupapi)
-endif()
-
-## Uncomment for example
-add_executable(serial_example examples/serial_example.cc)
-add_dependencies(serial_example ${PROJECT_NAME})
-target_link_libraries(serial_example ${PROJECT_NAME})
-
-## Install executable
-install(TARGETS ${PROJECT_NAME}
-    ARCHIVE DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
-    LIBRARY DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
+install(TARGETS Serial EXPORT SerialTargets
+  LIBRARY DESTINATION lib
+  ARCHIVE DESTINATION lib
+  RUNTIME DESTINATION bin
+  INCLUDES DESTINATION include
 )
-
-## Install headers
-install(FILES include/serial/serial.h
-  DESTINATION ${CATKIN_GLOBAL_INCLUDE_DESTINATION}/serial)
-
-## Tests
-if(CATKIN_ENABLE_TESTING)
-    add_subdirectory(tests)
-endif()
+install(EXPORT SerialTargets
+  FILE SerialTargets.cmake
+  NAMESPACE Serial::
+  DESTINATION lib/cmake/Serial
+)
