@@ -1,3 +1,11 @@
+###### Disclaimer
+
+>_I've started this repository as a fork of [William Woodall's serial](https://github.com/wjwwood/serial), who I really thank for the great job done so far._
+>
+>_However I'm going into a deep refactoring of this library and therefore I believe that no PRs will be ever accepted into his repository._
+>
+>_Only for this reason I've detached the fork from his repository, but I'm going to cherry pick hotfixes if I'll find during refactoring._
+
 # Serial Communication Library
 
 [![Build Status](https://travis-ci.org/wjwwood/serial.svg?branch=master)](https://travis-ci.org/wjwwood/serial)*(Linux and OS X)* [![Build Status](https://ci.appveyor.com/api/projects/status/github/wjwwood/serial)](https://ci.appveyor.com/project/wjwwood/serial)*(Windows)*
