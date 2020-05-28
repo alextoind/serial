@@ -6,8 +6,8 @@ if(APPLE)
   find_package(IOKit REQUIRED)
   find_package(Foundation REQUIRED)
 elseif(UNIX)
-  #find_package(rt REQUIRED)  #FIXME: not as package or moudle
-  find_package(Threads REQUIRED)
+  #find_package(rt REQUIRED)  #FIXME: not as package or module
+#  find_package(Threads REQUIRED)  #TODO: seems no longer required
 elseif(WIN32)
   #TODO: check if it is required and if find_package works
   find_package(setupapi REQUIRED)
@@ -61,5 +61,19 @@ install(TARGETS Serial EXPORT SerialTargets
 install(EXPORT SerialTargets
   FILE SerialTargets.cmake
   NAMESPACE Serial::
+  DESTINATION lib/cmake/Serial
+)
+
+include(CMakePackageConfigHelpers)
+configure_package_config_file(SerialConfig.cmake.in
+  ${CMAKE_CURRENT_BINARY_DIR}/SerialConfig.cmake
+  INSTALL_DESTINATION lib/cmake/Serial
+)
+write_basic_package_version_file(SerialConfigVersion.cmake
+  VERSION ${Serial_VERSION}
+  COMPATIBILITY SameMajorVersion
+)
+install(
+  FILES SerialConfig.cmake SerialConfigVersion.cmake
   DESTINATION lib/cmake/Serial
 )
