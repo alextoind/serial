@@ -727,13 +727,35 @@ class PortNotOpenedException : public std::exception {
 /*!
  * Structure that describes a serial device.
  */
-struct PortInfo {
+class PortInfo {
+ public:
+  PortInfo() = default;
+  ~PortInfo() = default;
+
   /*! Address of the serial port (this can be passed to the constructor of Serial). */
-  std::string port;
-  /*! Human readable description of serial device if available. */
-  std::string description;
-  /*! Hardware ID (e.g. VID:PID of USB serial devices) or "n/a" if not available. */
-  std::string hardware_id;
+  std::string serial_port;
+
+  uint16_t busnum;
+  uint16_t devnum;
+  uint16_t id_product;
+  uint16_t id_vendor;
+  std::string manufacturer;
+  std::string product;
+  std::string serial_number;
+
+#if defined(__linux__)
+  static std::vector<std::string> glob(const std::vector<std::string> &patterns);
+  std::vector<std::string> get_sysfs_info(const std::string &device_path);
+
+ private:
+  void getPortInfo(const std::string &sysfs_path);
+
+  std::string basename(const std::string &path);
+  std::string dirname(const std::string &path);
+  bool path_exists(const std::string &path);
+  std::string realpath(const std::string &path);
+  std::string format(const char *format, ...);
+#endif
 };
 
 /* Lists the serial ports available on the system
