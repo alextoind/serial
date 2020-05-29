@@ -6,7 +6,7 @@ if(APPLE)
   find_package(IOKit REQUIRED)
   find_package(Foundation REQUIRED)
 elseif(UNIX)
-  #find_package(rt REQUIRED)  #FIXME: not as package or module
+#  find_package(rt REQUIRED)  #FIXME: not as package or module
 #  find_package(Threads REQUIRED)  #TODO: seems no longer required
 elseif(WIN32)
   #TODO: check if it is required and if find_package works
@@ -74,6 +74,6 @@ write_basic_package_version_file(SerialConfigVersion.cmake
   COMPATIBILITY SameMajorVersion
 )
 install(
-  FILES SerialConfig.cmake SerialConfigVersion.cmake
+  FILES ${CMAKE_CURRENT_BINARY_DIR}/SerialConfig.cmake ${CMAKE_CURRENT_BINARY_DIR}/SerialConfigVersion.cmake
   DESTINATION lib/cmake/Serial
 )
