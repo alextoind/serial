@@ -77,3 +77,32 @@ install(
   FILES ${CMAKE_CURRENT_BINARY_DIR}/SerialConfig.cmake ${CMAKE_CURRENT_BINARY_DIR}/SerialConfigVersion.cmake
   DESTINATION lib/cmake/Serial
 )
+
+# Tests
+enable_testing()
+find_package(GTest REQUIRED)
+
+add_executable(unix_serial_tests
+  tests/unix_serial_tests.cc
+)
+target_link_libraries(unix_serial_tests PRIVATE
+  Serial
+  GTest::GTest
+  GTest::Main
+  util  #FIXME: this is just to use the already existing tests
+)
+add_test(NAME unix_serial_tests
+  COMMAND unix_serial_tests
+)
+
+add_executable(unix_timer_tests
+  tests/unix_timer_tests.cc
+)
+target_link_libraries(unix_timer_tests PRIVATE
+  Serial
+  GTest::GTest
+  GTest::Main
+)
+add_test(NAME unix_timer_tests
+  COMMAND unix_timer_tests
+)
