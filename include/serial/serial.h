@@ -745,16 +745,9 @@ class PortInfo {
 
 #if defined(__linux__)
   static std::vector<std::string> glob(const std::vector<std::string> &patterns);
-  std::vector<std::string> get_sysfs_info(const std::string &device_path);
 
- private:
+//FIXME private:
   void getPortInfo(const std::string &sysfs_path);
-
-  std::string basename(const std::string &path);
-  std::string dirname(const std::string &path);
-  bool path_exists(const std::string &path);
-  std::string realpath(const std::string &path);
-  std::string format(const char *format, ...);
 #endif
 };
 

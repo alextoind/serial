@@ -1,5 +1,3 @@
-#if defined(__linux__)
-
 /*
  * Copyright (c) 2014 Craig Lilley <cralilley@gmail.com>
  * This software is made available under the terms of the MIT licence.
@@ -7,22 +5,21 @@
  * http://opensource.org/licenses/MIT
  */
 
-#include <vector>
-#include <string>
-#include <sstream>
-#include <stdexcept>
-#include <iostream>
+#if defined(__linux__)
+
+#include <climits>
 #include <fstream>
-#include <cstdio>
-#include <cstdarg>
-#include <cstdlib>
+#include <iostream>
+#include <regex>
+#include <string>
+#include <vector>
 
 #include <glob.h>
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <unistd.h>
 
-#include "serial/serial.h"
+#include <serial/serial.h>
 
 using namespace serial;
 
@@ -49,144 +46,52 @@ std::vector<std::string> PortInfo::glob(const std::vector<std::string> &patterns
   return paths_found;
 }
 
-std::string PortInfo::basename(const std::string &path) {
-  size_t pos = path.rfind("/");
-
-  if (pos == std::string::npos) {
-    return path;
+void PortInfo::getPortInfo(const std::string &serial_port) {
+  std::smatch serial_port_match;
+  std::regex_match(serial_port, serial_port_match, std::regex("^/dev/([^/]+)/?$"));
+  if (serial_port_match.size() != 2) {
+    //TODO: wrong serial port name
+    return;
   }
+  std::string serial_port_name(serial_port_match[1]);
 
-  return std::string(path, pos + 1, std::string::npos);
-}
-
-std::string PortInfo::dirname(const std::string &path) {
-  size_t pos = path.rfind("/");
-
-  if (pos == std::string::npos) {
-    return path;
-  } else if (pos == 0) {
-    return "/";
+  struct stat serial_port_stat;
+  std::string system_path("/sys/class/tty/" + serial_port_name);
+  if (::lstat(system_path.c_str(), &serial_port_stat) == -1) {
+    //TODO: device not found in sys
+    return;
   }
-
-  return std::string(path, 0, pos);
-}
-
-bool PortInfo::path_exists(const std::string &path) {
-  struct stat sb;
-
-  if (stat(path.c_str(), &sb) == 0) {
-    return true;
+  if (!S_ISLNK(serial_port_stat.st_mode)) {
+    system_path = "/sys/class/tty/" + serial_port_name + "/device";
   }
-
-  return false;
-}
-
-std::string PortInfo::realpath(const std::string &path) {
-  char *real_path = ::realpath(path.c_str(), NULL);
-  std::string result;
-
-  if (real_path != NULL) {
-    result = real_path;
-    free(real_path);
+  char link_path[PATH_MAX];
+  ssize_t link_length = ::readlink(system_path.c_str(), link_path, sizeof(link_path) - 1);
+  if (link_length == -1) {
+    //TODO: link read error
+    return;
   }
+  link_path[link_length] = '\0';
 
-  return result;
-}
-
-std::vector<std::string> PortInfo::get_sysfs_info(const std::string &device_path) {
-  std::string device_name = basename(device_path);
-  std::string friendly_name;
-  std::string hardware_id;
-  std::string sys_device_path = format("/sys/class/tty/%s/device", device_name.c_str());
-
-  if (device_name.compare(0, 6, "ttyUSB") == 0) {
-    sys_device_path = dirname(dirname(realpath(sys_device_path)));
-
-    if (path_exists(sys_device_path)) {
-      getPortInfo(sys_device_path);
-    }
-  } else if (device_name.compare(0, 6, "ttyACM") == 0) {
-    sys_device_path = dirname(realpath(sys_device_path));
-
-    if (path_exists(sys_device_path)) {
-      getPortInfo(sys_device_path);
-    }
-  } else {
-    // Try to read ID std::string of PCI device
-    std::string sys_id_path = sys_device_path + "/id";
-
-    if (path_exists(sys_id_path)) {
-      std::ifstream(sys_id_path, std::ifstream::in) >> product;
-    }
-  }
-
-  if (friendly_name.empty()) {
-    friendly_name = device_name;
-  }
-
-  if (hardware_id.empty()) {
-    hardware_id = "n/a";
-  }
-
-  std::vector<std::string> result;
-  result.push_back(friendly_name);
-  result.push_back(hardware_id);
-
-  return result;
-}
-
-std::string PortInfo::format(const char *format, ...) {
-  va_list ap;
-  size_t buffer_size_bytes = 256;
-  std::string result;
-  char *buffer = (char *)malloc(buffer_size_bytes);
-
-  if (buffer == NULL) {
-    return result;
-  }
-
-  bool done = false;
-  unsigned int loop_count = 0;
-  while (!done) {
-    va_start(ap, format);
-    int return_value = vsnprintf(buffer, buffer_size_bytes, format, ap);
-
-    if (return_value < 0) {
-      done = true;
-    } else if (return_value >= buffer_size_bytes) {
-      // Realloc and try again.
-      buffer_size_bytes = return_value + 1;
-      char *new_buffer_ptr = (char *)realloc(buffer, buffer_size_bytes);
-
-      if (new_buffer_ptr == NULL) {
-        done = true;
-      } else {
-        buffer = new_buffer_ptr;
+  if (std::strstr(link_path, "usb")) {
+    system_path = "/sys/class/tty/" + serial_port_name + "/device";
+    for (int i=0; i<3; i++) {
+      system_path += "/..";
+      //FIXME: should check the existence at least for the first four files
+      if (::stat((system_path + "/busnum").c_str(), &serial_port_stat) == -1) {
+        continue;
       }
-    } else {
-      result = buffer;
-      done = true;
-    }
-
-    va_end(ap);
-
-    if (++loop_count > 5) {
-      done = true;
+      std::ifstream(system_path + "/busnum") >> busnum;
+      std::ifstream(system_path + "/devnum") >> devnum;
+      std::ifstream(system_path + "/idProduct") >> id_product;
+      std::ifstream(system_path + "/idVendor") >> id_vendor;
+      std::getline(std::ifstream(system_path + "/manufacturer"), manufacturer);
+      std::getline(std::ifstream(system_path + "/product"), product);
+      std::getline(std::ifstream(system_path + "/serial"), serial_number);
+      break;
     }
   }
 
-  free(buffer);
-  return result;
-}
-
-void PortInfo::getPortInfo(const std::string &sysfs_path) {
-  std::ifstream(sysfs_path + "/busnum", std::ifstream::in) >> busnum;
-  std::ifstream(sysfs_path + "/devnum", std::ifstream::in) >> devnum;
-  std::ifstream(sysfs_path + "/idProduct", std::ifstream::in) >> id_product;
-  std::ifstream(sysfs_path + "/idVendor", std::ifstream::in) >> id_vendor;
-  std::ifstream(sysfs_path + "/manufacturer", std::ifstream::in) >> manufacturer;
-  std::ifstream(sysfs_path + "/product", std::ifstream::in) >> product;
-  std::ifstream(sysfs_path + "/serial", std::ifstream::in) >> serial_number;
+  this->serial_port = serial_port;
 }
 
 std::vector<PortInfo> serial::list_ports() {
@@ -206,8 +111,7 @@ std::vector<PortInfo> serial::list_ports() {
     std::string device = *iter++;
 
     PortInfo device_entry;
-    device_entry.serial_port = device;
-    device_entry.get_sysfs_info(device);
+    device_entry.getPortInfo(device);
 
     results.push_back(device_entry);
   }
