@@ -2,9 +2,7 @@ cmake_minimum_required(VERSION 3.5.1 FATAL_ERROR)
 project(Serial VERSION 2.0.0 LANGUAGES CXX)
 
 if(APPLE)
-  #TODO: check if both are required and if find_package instead of find_library works
-  find_package(IOKit REQUIRED)
-  find_package(Foundation REQUIRED)
+
 elseif(UNIX)
 #  find_package(rt REQUIRED)  #FIXME: not as package or module
 #  find_package(Threads REQUIRED)  #TODO: seems no longer required
