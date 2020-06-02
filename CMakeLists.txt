@@ -51,6 +51,12 @@ else()  # already asserted WIN32 during find_package block
     setupapi
   )
 endif()
+# target_compile_features(Serial PUBLIC cxx_std_11) is available only from CMake 3.8
+set_target_properties(Serial PROPERTIES
+  CXX_STANDARD 11
+  CXX_STANDARD_REQUIRED ON
+  CXX_EXTENSIONS NO
+)
 
 install(TARGETS Serial EXPORT SerialTargets
   LIBRARY DESTINATION lib
@@ -91,6 +97,11 @@ target_link_libraries(unix_serial_tests PRIVATE
   GTest::Main
   util  #FIXME: this is just to use the already existing tests
 )
+set_target_properties(unix_serial_tests PROPERTIES
+  CXX_STANDARD 11
+  CXX_STANDARD_REQUIRED ON
+  CXX_EXTENSIONS NO
+)
 add_test(NAME unix_serial_tests
   COMMAND unix_serial_tests
 )
@@ -102,6 +113,11 @@ target_link_libraries(unix_timer_tests PRIVATE
   Serial
   GTest::GTest
   GTest::Main
+)
+set_target_properties(unix_timer_tests PROPERTIES
+  CXX_STANDARD 11
+  CXX_STANDARD_REQUIRED ON
+  CXX_EXTENSIONS NO
 )
 add_test(NAME unix_timer_tests
   COMMAND unix_timer_tests
