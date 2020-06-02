@@ -51,6 +51,12 @@ else()  # already asserted WIN32 during find_package block
     setupapi
   )
 endif()
+# target_compile_features(Serial PUBLIC cxx_std_11) is available only from CMake 3.8
+set_target_properties(Serial PROPERTIES
+  CXX_STANDARD 11
+  CXX_STANDARD_REQUIRED ON
+  CXX_EXTENSIONS NO
+)
 
 install(TARGETS Serial EXPORT SerialTargets
   LIBRARY DESTINATION lib
