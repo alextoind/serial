@@ -2,7 +2,8 @@ cmake_minimum_required(VERSION 3.5.1 FATAL_ERROR)
 project(Serial VERSION 2.0.0 LANGUAGES CXX)
 
 if(APPLE)
-
+  find_library(IOKIT_LIBRARY IOKit)
+  find_library(FOUNDATION_LIBRARY Foundation)
 elseif(UNIX)
 #  find_package(rt REQUIRED)  #FIXME: not as package or module
 #  find_package(Threads REQUIRED)  #TODO: seems no longer required
@@ -27,8 +28,8 @@ if(APPLE)
     src/impl/list_ports/list_ports_osx.cc
   )
   target_link_libraries(Serial PRIVATE
-    IOKit
-    Foundation
+    ${IOKIT_LIBRARY}
+    ${IOKIT_LIBRARY}
   )
 elseif(UNIX)
   target_sources(Serial PRIVATE
