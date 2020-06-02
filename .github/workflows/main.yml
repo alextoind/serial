@@ -20,8 +20,12 @@ jobs:
     steps:
     - name: Install Dependencies
       run: |
-        git clone https://github.com/google/googletest.git
+        git clone https://github.com/google/googletest.git ${{runner.workspace}}/googletest
+        echo "${{runner.workspace}}"
+        ls -l
         mkdir googletest/build && cd $_
+        echo "test cd $_"
+        ls -l
         cmake .. -DCMAKE_CXX_FLAGS=-std=c++11 && sudo make install
 
     - name: Checkout
