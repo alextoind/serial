@@ -30,7 +30,7 @@ jobs:
     - name: Configure GTest CMake
       shell: bash
       working-directory: ${{runner.workspace}}/googletest/build
-      run: cmake $GITHUB_WORKSPACE -DCMAKE_CXX_FLAGS=-std=c++11
+      run: cmake .. -DCMAKE_CXX_FLAGS=-std=c++11
 
     - name: Install GTest
       shell: bash
