@@ -3,7 +3,17 @@ project(Serial VERSION 2.0.0 LANGUAGES CXX)
 
 if(APPLE)
   find_library(IOKIT_LIBRARY IOKit)
+  if (NOT IOKIT_LIBRARY)
+    message(FATAL_ERROR "IOKit framework not found")
+  endif()
   find_library(FOUNDATION_LIBRARY Foundation)
+  if (NOT FOUNDATION_LIBRARY)
+    message(FATAL_ERROR "Foundation framework not found")
+  endif()
+  find_library(COREFOUNDATION_LIBRARY CoreFoundation)
+  if (NOT COREFOUNDATION_LIBRARY)
+    message(FATAL_ERROR "CoreFoundation framework not found")
+  endif()
 elseif(UNIX)
 #  find_package(rt REQUIRED)  #FIXME: not as package or module
 #  find_package(Threads REQUIRED)  #TODO: seems no longer required
@@ -28,8 +38,8 @@ if(APPLE)
     src/impl/list_ports/list_ports_osx.cc
   )
   target_link_libraries(Serial PRIVATE
-    ${IOKIT_LIBRARY}
-    ${IOKIT_LIBRARY}
+    "-framework CoreFoundation"
+    "-framework IOKit"
   )
 elseif(UNIX)
   target_sources(Serial PRIVATE
