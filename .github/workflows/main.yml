@@ -36,7 +36,7 @@ jobs:
     - name: Install GTest
       shell: bash
       working-directory: ${{runner.workspace}}/googletest/build
-      run: sudo cmake --build . --target install
+      run: sudo cmake --build . --target install || runas /noprofile /user:Administrator cmake --build . --target install
 
     - name: Checkout
       uses: actions/checkout@v2
