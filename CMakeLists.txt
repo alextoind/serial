@@ -90,6 +90,7 @@ install(
 
 # Tests
 enable_testing()
+message(STATUS "GTEST_ROOT= ${GTEST_ROOT}")
 find_package(GTest REQUIRED)
 
 add_executable(unix_serial_tests
