@@ -90,7 +90,7 @@ install(
 
 # Tests
 enable_testing()
-message(STATUS "GTEST_ROOT= ${GTEST_ROOT}")
+message(STATUS "CMAKE_PREFIX_PATH= ${CMAKE_PREFIX_PATH}")
 find_package(GTest REQUIRED)
 
 add_executable(unix_serial_tests
