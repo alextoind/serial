@@ -29,7 +29,7 @@ void loop()
 
 #if defined(__linux__)
 #include <pty.h>
-#else
+#elif defined(__APPLE__)
 #include <util.h>
 #endif
 
@@ -39,6 +39,7 @@ using std::string;
 
 namespace {
 
+#if !defined(_WIN32)
 class SerialTests : public ::testing::Test {
 protected:
   virtual void SetUp() {
@@ -101,6 +102,11 @@ TEST_F(SerialTests, partialRead) {
   write(master_fd, "abc\n", 4);
   string r = port1->read(4);
   EXPECT_EQ(r, string("abc\n"));
+}
+#endif
+
+TEST(timer_tests, dummy) {
+  ASSERT_TRUE(true);
 }
 
 }  // namespace
