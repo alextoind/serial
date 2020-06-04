@@ -31,12 +31,12 @@ jobs:
     - name: Configure GTest CMake
       shell: bash
       working-directory: ${{runner.workspace}}/googletest/build
-      run: cmake .. -DCMAKE_CXX_FLAGS=-std=c++11
+      run: cmake .. -DCMAKE_CXX_FLAGS=-std=c++11 -DCMAKE_BUILD_TYPE=$BUILD_TYPE
 
     - name: Install GTest
       shell: bash
       working-directory: ${{runner.workspace}}/googletest/build
-      run: cmake --build . --target install || sudo cmake --build . --target install
+      run: cmake --build . --config $BUILD_TYPE --target install || sudo cmake --build . --config $BUILD_TYPE --target install
 
     - name: Add GTest to PATH on Windows
       shell: powershell
