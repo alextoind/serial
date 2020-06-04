@@ -44,9 +44,9 @@ jobs:
       run: echo '::add-path::C:/Program Files (x86)/googletest-distribution;C:/Program Files (x86)/googletest-distribution/lib;C:/Program Files (x86)/googletest-distribution/lib/cmake/GTest'
 
     - name: Debug PATH on Windows
-      shell: bash
+      shell: powershell
       if: runner.os == 'Windows'
-      run: echo 'PATH=' $PATH
+      run: echo ${env:PATH}
 
     - name: Checkout
       uses: actions/checkout@v2
