@@ -8,6 +8,7 @@ using serial::MillisecondTimer;
 
 namespace {
 
+#if defined(__linux__)
 /**
  * Do 100 trials of timing gaps between 0 and 19 milliseconds.
  * Expect accuracy within one millisecond.
@@ -53,6 +54,11 @@ TEST(timer_tests, overlapping_long_intervals) {
     EXPECT_NEAR(timers[t]->remaining(), -slush_factor + t, 5);
     delete timers[t];
   }
+}
+#endif
+
+TEST(timer_tests, dummy) {
+  ASSERT_TRUE(true);
 }
 
 }  // namespace
