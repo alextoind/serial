@@ -38,10 +38,10 @@ jobs:
       working-directory: ${{runner.workspace}}/googletest/build
       run: cmake --build . --target install || sudo cmake --build . --target install
 
-    - name: Export GTEST_ROOT on Windows
+    - name: Export CMAKE_PREFIX_PATH on Windows
       shell: bash
       if: runner.os == 'Windows'
-      run: echo "::set-env name=GTEST_ROOT::C:\Program Files (x86)\googletest-distribution"
+      run: echo "::set-env name=CMAKE_PREFIX_PATH::C:\Program Files (x86)\googletest-distribution"
 
     - name: Checkout
       uses: actions/checkout@v2
