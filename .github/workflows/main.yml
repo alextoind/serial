@@ -38,15 +38,15 @@ jobs:
       working-directory: ${{runner.workspace}}/googletest/build
       run: cmake --build . --target install || sudo cmake --build . --target install
 
-    - name: Export CMAKE_PREFIX_PATH on Windows
+    - name: Add GTest to PATH on Windows
       shell: bash
       if: runner.os == 'Windows'
-      run: echo '::set-env name=CMAKE_PREFIX_PATH::C:/Program Files (x86)/googletest-distribution;C:/Program Files (x86)/googletest-distribution/lib;C:/Program Files (x86)/googletest-distribution/lib/cmake/GTest'
+      run: echo '::add-path::C:/Program Files (x86)/googletest-distribution;C:/Program Files (x86)/googletest-distribution/lib;C:/Program Files (x86)/googletest-distribution/lib/cmake/GTest'
 
-    - name: Echo CMAKE_PREFIX_PATH on Windows
+    - name: Debug PATH on Windows
       shell: bash
       if: runner.os == 'Windows'
-      run: echo 'CMAKE_PREFIX_PATH= ' $CMAKE_PREFIX_PATH
+      run: echo 'PATH=' $PATH
 
     - name: Checkout
       uses: actions/checkout@v2
