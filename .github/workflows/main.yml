@@ -39,9 +39,9 @@ jobs:
       run: cmake --build . --target install || sudo cmake --build . --target install
 
     - name: Add GTest to PATH on Windows
-      shell: bash
+      shell: powershell
       if: runner.os == 'Windows'
-      run: echo '::add-path::C:/Program Files (x86)/googletest-distribution;C:/Program Files (x86)/googletest-distribution/lib;C:/Program Files (x86)/googletest-distribution/lib/cmake/GTest'
+      run: echo '::add-path::C:\Program Files (x86)\googletest-distribution\;C:\Program Files (x86)\googletest-distribution\lib\;C:\Program Files (x86)\googletest-distribution\lib\cmake\;C:\Program Files (x86)\googletest-distribution\lib\cmake\GTest\'
 
     - name: Debug PATH on Windows
       shell: powershell
