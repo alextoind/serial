@@ -96,17 +96,12 @@ add_executable(unix_serial_tests
   tests/unix_serial_tests.cc
 )
 target_link_libraries(unix_serial_tests PRIVATE
+  Serial
   GTest::GTest
   GTest::Main
 )
-if(WIN32)
+if(UNIX)
 target_link_libraries(unix_serial_tests PRIVATE
-  Serial.dll
-  Serial
-)
-else()
-target_link_libraries(unix_serial_tests PRIVATE
-  Serial
   util  #FIXME: this is just to use the already existing tests
 )
 endif()
@@ -123,19 +118,10 @@ add_executable(unix_timer_tests
   tests/unix_timer_tests.cc
 )
 target_link_libraries(unix_timer_tests PRIVATE
+  Serial
   GTest::GTest
   GTest::Main
 )
-if(WIN32)
-target_link_libraries(unix_timer_tests PRIVATE
-  Serial.dll
-  Serial
-)
-else()
-target_link_libraries(unix_timer_tests PRIVATE
-  Serial
-)
-endif()
 set_target_properties(unix_timer_tests PROPERTIES
   CXX_STANDARD 11
   CXX_STANDARD_REQUIRED ON
