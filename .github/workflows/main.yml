@@ -56,18 +56,6 @@ jobs:
       working-directory: ${{runner.workspace}}/serial/build
       run: cmake .. -DCMAKE_BUILD_TYPE=$BUILD_TYPE
 
-    - name: Cat unix_serial_tests.vcxproj on Windows
-      shell: bash
-      working-directory: ${{runner.workspace}}/serial/build
-      if: runner.os == 'Windows'
-      run: cat unix_serial_tests.vcxproj
-
-    - name: List libraries on Windows
-      shell: powershell
-      working-directory: ${{runner.workspace}}/serial/build/Release
-      if: runner.os == 'Windows'
-      run: Get-ChildItem -Path ${{runner.workspace}}\serial\build\ -Force -Recurse
-
     - name: Build
       shell: bash
       working-directory: ${{runner.workspace}}/serial/build
