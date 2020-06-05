@@ -102,6 +102,7 @@ target_link_libraries(unix_serial_tests PRIVATE
 if(WIN32)
 target_link_libraries(unix_serial_tests PRIVATE
   Serial.dll
+  Serial
 )
 else()
 target_link_libraries(unix_serial_tests PRIVATE
@@ -128,6 +129,7 @@ target_link_libraries(unix_timer_tests PRIVATE
 if(WIN32)
 target_link_libraries(unix_timer_tests PRIVATE
   Serial.dll
+  Serial
 )
 else()
 target_link_libraries(unix_timer_tests PRIVATE
