@@ -62,6 +62,12 @@ jobs:
       if: runner.os == 'Windows'
       run: cat unix_serial_tests.vcxproj
 
+    - name: List libraries on Windows
+      shell: bash
+      working-directory: ${{runner.workspace}}/serial/build/Release
+      if: runner.os == 'Windows'
+      run: ls -l
+
     - name: Build
       shell: bash
       working-directory: ${{runner.workspace}}/serial/build
