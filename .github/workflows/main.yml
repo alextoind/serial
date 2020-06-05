@@ -63,10 +63,10 @@ jobs:
       run: cat unix_serial_tests.vcxproj
 
     - name: List libraries on Windows
-      shell: bash
+      shell: powershell
       working-directory: ${{runner.workspace}}/serial/build/Release
       if: runner.os == 'Windows'
-      run: dir -l .
+      run: Get-ChildItem -Path ${{runner.workspace}}/serial/build/Release -Force -Recurse
 
     - name: Build
       shell: bash
