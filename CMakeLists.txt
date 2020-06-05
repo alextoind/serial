@@ -19,7 +19,7 @@ else()
   message(FATAL_ERROR "Not supported platform.")
 endif()
 
-add_library(Serial STATIC
+add_library(Serial SHARED
   src/serial.cc
 )
 target_include_directories(Serial PUBLIC
@@ -61,6 +61,7 @@ set_target_properties(Serial PROPERTIES
   CXX_STANDARD_REQUIRED ON
   CXX_EXTENSIONS NO
 )
+add_library(Serial::Serial ALIAS Serial)
 
 install(TARGETS Serial EXPORT SerialTargets
   LIBRARY DESTINATION lib
@@ -96,7 +97,7 @@ add_executable(unix_serial_tests
   tests/unix_serial_tests.cc
 )
 target_link_libraries(unix_serial_tests PRIVATE
-  Serial
+  Serial::Serial
   GTest::GTest
   GTest::Main
 )
@@ -118,7 +119,7 @@ add_executable(unix_timer_tests
   tests/unix_timer_tests.cc
 )
 target_link_libraries(unix_timer_tests PRIVATE
-  Serial
+  Serial::Serial
   GTest::GTest
   GTest::Main
 )

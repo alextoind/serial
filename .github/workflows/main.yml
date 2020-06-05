@@ -38,17 +38,10 @@ jobs:
       working-directory: ${{runner.workspace}}/googletest/build
       run: cmake --build . --config $BUILD_TYPE --target install || sudo cmake --build . --config $BUILD_TYPE --target install
 
-    - name: Export variables on Windows
+    - name: Export CMAKE_PREFIX_PATH on Windows
       shell: bash
       if: runner.os == 'Windows'
-      run: |
-        echo '::set-env name=CMAKE_PREFIX_PATH::C:/Program Files (x86)/googletest-distribution'
-        echo '::set-env name=CMAKE_FIND_LIBRARY_SUFFIXES::.dll'
-
-    - name: Debug CMAKE_FIND_LIBRARY_SUFFIXES on Windows
-      shell: bash
-      if: runner.os == 'Windows'
-      run: echo 'CMAKE_FIND_LIBRARY_SUFFIXES =' $CMAKE_FIND_LIBRARY_SUFFIXES
+      run: echo '::set-env name=CMAKE_PREFIX_PATH::C:/Program Files (x86)/googletest-distribution'
 
     - name: Checkout
       uses: actions/checkout@v2
