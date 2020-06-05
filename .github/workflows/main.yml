@@ -66,7 +66,7 @@ jobs:
       shell: powershell
       working-directory: ${{runner.workspace}}/serial/build/Release
       if: runner.os == 'Windows'
-      run: Get-ChildItem -Path ${{runner.workspace}}/serial/build/Release -Force -Recurse
+      run: Get-ChildItem -Path ${{runner.workspace}}\serial\build\ -Force -Recurse
 
     - name: Build
       shell: bash
