@@ -31,7 +31,7 @@ jobs:
     - name: Configure GTest CMake
       shell: bash
       working-directory: ${{runner.workspace}}/googletest/build
-      run: cmake .. -DCMAKE_BUILD_TYPE=$BUILD_TYPE -DCMAKE_CXX_FLAGS=-std=c++11
+      run: cmake .. -DCMAKE_BUILD_TYPE=$BUILD_TYPE -DCMAKE_CXX_FLAGS=-std=c++11 -DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreaded
 
     - name: Install GTest
       shell: bash
