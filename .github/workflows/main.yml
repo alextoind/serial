@@ -31,7 +31,7 @@ jobs:
     - name: Configure GTest CMake
       shell: bash
       working-directory: ${{runner.workspace}}/googletest/build
-      run: cmake .. -DCMAKE_BUILD_TYPE=$BUILD_TYPE -DCMAKE_CXX_FLAGS=-std=c++11 -DGTEST_CREATE_SHARED_LIBRARY=TRUE
+      run: cmake .. -DCMAKE_BUILD_TYPE=$BUILD_TYPE -DCMAKE_CXX_FLAGS=-std=c++11 -DGTEST_CREATE_SHARED_LIBRARY=1
 
     - name: Install GTest
       shell: bash
@@ -54,7 +54,7 @@ jobs:
     - name: Configure CMake
       shell: bash
       working-directory: ${{runner.workspace}}/serial/build
-      run: cmake .. -DCMAKE_BUILD_TYPE=$BUILD_TYPE -DCMAKE_WINDOWS_EXPORT_ALL_SYMBOLS=TRUE -DBUILD_SHARED_LIBS=TRUE -DGTEST_LINKED_AS_SHARED_LIBRARY=TRUE
+      run: cmake .. -DCMAKE_BUILD_TYPE=$BUILD_TYPE -DCMAKE_WINDOWS_EXPORT_ALL_SYMBOLS=TRUE -DBUILD_SHARED_LIBS=TRUE -DGTEST_LINKED_AS_SHARED_LIBRARY=1
 
     - name: Build
       shell: bash
