@@ -92,8 +92,11 @@ install(
 # Tests
 enable_testing()
 find_package(GTest REQUIRED)
+if(_WIN32)
+  set(gtest_force_shared_crt ON CACHE BOOL "" FORCE)
+endif()
 
-if(UNIX)  #FIXME: exclude Windows until fatal error LNK1181 is fixed
+#if(UNIX)  #FIXME: exclude Windows until fatal error LNK1181 is fixed
 add_executable(unix_serial_tests
   tests/unix_serial_tests.cc
 )
@@ -132,4 +135,4 @@ set_target_properties(unix_timer_tests PROPERTIES
 add_test(NAME unix_timer_tests
   COMMAND unix_timer_tests
 )
-endif()
+#endif()
