@@ -66,6 +66,7 @@ jobs:
       if: runner.os == 'Windows'
       run: |
         cmake -E copy_directory "$CMAKE_PREFIX_PATH/bin" "$CMAKE_PREFIX_PATH/lib"
+        cmake -E copy_directory "$CMAKE_PREFIX_PATH/bin" "${{runner.workspace}}/serial/build/Release"
         find "$CMAKE_PREFIX_PATH" -name "*"
 
     - name: List files
