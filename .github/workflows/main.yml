@@ -63,8 +63,9 @@ jobs:
 
     - name: Copy .dll on Windows
       shell: bash
+      working-directory: $CMAKE_PREFIX_PATH
       if: runner.os == 'Windows'
-      run: cp $CMAKE_PREFIX_PATH/bin/* $CMAKE_PREFIX_PATH/lib/
+      run: cp bin/* lib/
 
     - name: Test
       shell: bash
