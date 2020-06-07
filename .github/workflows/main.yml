@@ -65,7 +65,7 @@ jobs:
       shell: bash
       working-directory: $CMAKE_PREFIX_PATH
       if: runner.os == 'Windows'
-      run: cp bin/* lib/
+      run: cmake -E copy_directory bin lib
 
     - name: Test
       shell: bash
