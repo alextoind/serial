@@ -68,6 +68,13 @@ jobs:
         cmake -E copy_directory "$CMAKE_PREFIX_PATH/bin" "$CMAKE_PREFIX_PATH/lib"
         find "$CMAKE_PREFIX_PATH" -name "*"
 
+    - name: List files
+      shell: bash
+      working-directory: ${{runner.workspace}}
+      if: runner.os == 'Windows'
+      run: |
+        find . -name "*"
+
     - name: Test
       shell: bash
       working-directory: ${{runner.workspace}}/serial/build
