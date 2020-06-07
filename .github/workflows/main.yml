@@ -65,8 +65,8 @@ jobs:
       shell: bash
       if: runner.os == 'Windows'
       run: |
-        cmake -E copy_directory '$CMAKE_PREFIX_PATH/bin' '$CMAKE_PREFIX_PATH/lib'
-        find '$CMAKE_PREFIX_PATH' -name '*'
+        cmake -E copy_directory "$CMAKE_PREFIX_PATH/bin" "$CMAKE_PREFIX_PATH/lib"
+        find "$CMAKE_PREFIX_PATH" -name "*"
 
     - name: Test
       shell: bash
