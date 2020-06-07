@@ -19,7 +19,7 @@ else()
   message(FATAL_ERROR "Not supported platform.")
 endif()
 
-add_library(Serial STATIC
+add_library(Serial SHARED
   src/serial.cc
 )
 target_include_directories(Serial PUBLIC
