@@ -61,20 +61,10 @@ jobs:
       working-directory: ${{runner.workspace}}/serial/build
       run: cmake --build . --config $BUILD_TYPE --target install || sudo cmake --build . --config $BUILD_TYPE --target install
 
-    - name: Copy .dll on Windows
+    - name: Copy GTest .dll in Release on Windows
       shell: bash
       if: runner.os == 'Windows'
-      run: |
-        cmake -E copy_directory "$CMAKE_PREFIX_PATH/bin" "$CMAKE_PREFIX_PATH/lib"
-        cmake -E copy_directory "$CMAKE_PREFIX_PATH/bin" "${{runner.workspace}}/serial/build/Release"
-        find "$CMAKE_PREFIX_PATH" -name "*"
-
-    - name: List files
-      shell: bash
-      working-directory: ${{runner.workspace}}
-      if: runner.os == 'Windows'
-      run: |
-        find . -name "*"
+      run: cmake -E copy_directory "$CMAKE_PREFIX_PATH/bin" "${{runner.workspace}}/serial/build/Release"
 
     - name: Test
       shell: bash
