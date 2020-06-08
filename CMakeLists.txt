@@ -30,7 +30,7 @@ target_include_directories(Serial PUBLIC
 if(APPLE)
   target_sources(Serial PRIVATE
     src/impl/impl_unix.cc
-    src/impl/list_ports/list_ports_osx.cc
+    src/impl/list_ports/list_ports_macos.cc
   )
   target_link_libraries(Serial PRIVATE
     "-framework CoreFoundation"
@@ -131,3 +131,23 @@ set_target_properties(unix_timer_tests PROPERTIES
 add_test(NAME unix_timer_tests
   COMMAND unix_timer_tests
 )
+
+if(UNIX AND NOT APPLE)
+add_executable(unix_list_ports_tests
+  tests/unix_list_ports_tests.cc
+)
+target_link_libraries(unix_list_ports_tests PRIVATE
+  Serial::Serial
+  GTest::GTest
+  GTest::Main
+  gmock
+)
+set_target_properties(unix_list_ports_tests PROPERTIES
+  CXX_STANDARD 11
+  CXX_STANDARD_REQUIRED ON
+  CXX_EXTENSIONS NO
+)
+add_test(NAME unix_list_ports_tests
+  COMMAND unix_list_ports_tests
+)
+endif()
