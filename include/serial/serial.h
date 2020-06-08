@@ -744,21 +744,15 @@ class PortInfo {
   std::string serial_number;
 
 #if defined(__linux__)
-  static std::vector<std::string> glob(const std::vector<std::string> &patterns);
-
-//FIXME private:
-  int getPortInfo(const std::string &serial_port);
+  int getPortInfo(const std::string &serial_port_name);
 #endif
 };
 
-/* Lists the serial ports available on the system
- *
- * Returns a vector of available serial ports, each represented
- * by a serial::PortInfo data structure:
- *
- * \return vector of serial::PortInfo.
- */
-std::vector<PortInfo> list_ports();
+#if defined(__linux__)
+int getLinkPath(std::string system_path, std::string &link_path);
+int getPortsInfo(std::vector<PortInfo> &serial_ports);
+int getPortsList(std::vector<std::string> &serial_port_names);
+#endif
 } // namespace serial
 
 #endif

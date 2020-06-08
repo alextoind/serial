@@ -11,11 +11,11 @@
 #include <fstream>
 #include <iostream>
 #include <regex>
-#include <string>
-#include <vector>
 
+#include <fcntl.h>
 #include <glob.h>
-#include <sys/types.h>
+#include <linux/serial.h>
+#include <sys/ioctl.h>
 #include <sys/stat.h>
 #include <unistd.h>
 
@@ -23,60 +23,28 @@
 
 using namespace serial;
 
-std::vector<std::string> PortInfo::glob(const std::vector<std::string> &patterns) {
-  std::vector<std::string> paths_found;
-
-  if (patterns.size() == 0) {
-    return paths_found;
-  }
-
-  glob_t glob_results;
-  int glob_retval = ::glob(patterns[0].c_str(), 0, NULL, &glob_results);
-
-  std::vector<std::string>::const_iterator iter = patterns.begin();
-  while (++iter != patterns.end()) {
-    glob_retval = ::glob(iter->c_str(), GLOB_APPEND, NULL, &glob_results);
-  }
-
-  for (int path_index = 0; path_index < glob_results.gl_pathc; path_index++) {
-    paths_found.push_back(glob_results.gl_pathv[path_index]);
-  }
-
-  globfree(&glob_results);
-  return paths_found;
-}
-
-int PortInfo::getPortInfo(const std::string &serial_port) {
+int PortInfo::getPortInfo(const std::string &serial_port_name) {
   std::smatch serial_port_match;
-  std::regex_match(serial_port, serial_port_match, std::regex("^/dev/([^/]+)/?$"));
+  std::regex_match(serial_port_name, serial_port_match, std::regex("^/dev/([^/]+)/?$"));
   if (serial_port_match.size() != 2) {
     //TODO: wrong serial port name
     return -1;
   }
-  std::string serial_port_name(serial_port_match[1]);
+  std::string serial_port_substr(serial_port_match[1]);
 
-  struct stat serial_port_stat;
-  std::string system_path("/sys/class/tty/" + serial_port_name);
-  if (::lstat(system_path.c_str(), &serial_port_stat) == -1) {
-    //TODO: device not found in sys
+  std::string link_path;
+  std::string system_path("/sys/class/tty/" + serial_port_substr);
+  if (getLinkPath(system_path, link_path)) {
+    //TODO: device not found in sys or link read error
     return -1;
   }
-  if (!S_ISLNK(serial_port_stat.st_mode)) {
-    system_path = "/sys/class/tty/" + serial_port_name + "/device";
-  }
-  char link_path[PATH_MAX];
-  ssize_t link_length = ::readlink(system_path.c_str(), link_path, sizeof(link_path) - 1);
-  if (link_length == -1) {
-    //TODO: link read error
-    return -1;
-  }
-  link_path[link_length] = '\0';
 
-  if (std::strstr(link_path, "usb")) {
-    system_path = "/sys/class/tty/" + serial_port_name + "/device";
+  if (std::strstr(link_path.c_str(), "usb")) {
+    system_path = "/sys/class/tty/" + serial_port_substr + "/device";
     for (int i=0; i<3; i++) {
       system_path += "/..";
       //FIXME: should check the existence at least for the first four files
+      struct stat serial_port_stat;
       if (::stat((system_path + "/busnum").c_str(), &serial_port_stat) == -1) {
         continue;
       }
@@ -90,34 +58,81 @@ int PortInfo::getPortInfo(const std::string &serial_port) {
       break;
     }
   }
-
-  this->serial_port = serial_port;
+  serial_port = serial_port_name;
   return 0;
 }
 
-std::vector<PortInfo> serial::list_ports() {
-  std::vector<PortInfo> results;
+int serial::getLinkPath(std::string system_path, std::string &link_path) {
+  struct stat serial_port_stat;
+  if (::lstat(system_path.c_str(), &serial_port_stat) == -1) {
+    return -1;
+  }
+  if (!S_ISLNK(serial_port_stat.st_mode)) {
+    system_path += "/device";
+  }
+  char link_path_buf[PATH_MAX];
+  ssize_t link_length = ::readlink(system_path.c_str(), link_path_buf, sizeof(link_path_buf) - 1);
+  if (link_length == -1) {
+    return -1;
+  }
+  link_path_buf[link_length] = '\0';
+  link_path = std::string(link_path_buf);
+  return 0;
+}
 
-  std::vector<std::string> search_globs;
-  search_globs.push_back("/dev/ttyACM*");
-  search_globs.push_back("/dev/ttyS*");
-  search_globs.push_back("/dev/ttyUSB*");
-  search_globs.push_back("/dev/tty.*");
-  search_globs.push_back("/dev/cu.*");
+int serial::getPortsInfo(std::vector<PortInfo> &serial_ports) {
+  serial_ports.clear();
+  std::vector<std::string> serial_port_names;
+  if (getPortsList(serial_port_names) < 0) {
+    return -1;
+  }
+  for (auto const &serial_port_name : serial_port_names) {
+    PortInfo serial_port;
+    if (!serial_port.getPortInfo(serial_port_name)) {
+      serial_ports.push_back(serial_port);
+    }
+  }
+  return serial_ports.size();
+}
 
-  std::vector<std::string> devices_found = PortInfo::glob(search_globs);  //FIXME: maybe in PortInfo constructor
-  std::vector<std::string>::iterator iter = devices_found.begin();
+int serial::getPortsList(std::vector<std::string> &serial_port_names) {
+  serial_port_names.clear();
 
-  while (iter != devices_found.end()) {
-    std::string device = *iter++;
-
-    PortInfo device_entry;
-    device_entry.getPortInfo(device);
-
-    results.push_back(device_entry);
+  glob_t glob_results;
+  std::string glob_pattern("/sys/class/tty/*");
+  if (::glob(glob_pattern.c_str(), 0, nullptr, &glob_results)) {
+    // 'serial_port_names' is cleared
+    globfree(&glob_results);
+    return -1;
   }
 
-  return results;
+  for (int i=0; i<glob_results.gl_pathc; i++) {
+    std::string link_path;
+    std::string system_path(glob_results.gl_pathv[i]);
+    if (getLinkPath(system_path, link_path)) {
+      continue;
+    }
+    if (std::strstr(link_path.c_str(), "virtual")) {
+      continue;
+    }
+    std::string serial_port_name("/dev/" + std::string(system_path.c_str() + std::strlen("/sys/class/tty/")));
+    if (std::strstr(link_path.c_str(), "serial8250")) {
+      int file_descriptor = ::open(serial_port_name.c_str(), O_RDWR | O_NOCTTY | O_NONBLOCK | O_CLOEXEC);
+      if (file_descriptor < 0) {
+        continue;
+      }
+      struct serial_struct serial_info;
+      if (::ioctl(file_descriptor, TIOCGSERIAL, &serial_info) || serial_info.type == PORT_UNKNOWN) {
+        ::close(file_descriptor);
+        continue;
+      }
+      ::close(file_descriptor);
+    }
+    serial_port_names.push_back(serial_port_name);
+  }
+
+  globfree(&glob_results);
+  return serial_port_names.size();
 }
 
 #endif // defined(__linux__)
