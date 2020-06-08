@@ -131,3 +131,21 @@ set_target_properties(unix_timer_tests PROPERTIES
 add_test(NAME unix_timer_tests
   COMMAND unix_timer_tests
 )
+
+add_executable(unix_list_ports_tests
+  tests/unix_list_ports_tests.cc
+)
+target_link_libraries(unix_list_ports_tests PRIVATE
+  Serial::Serial
+  GTest::GTest
+  GTest::Main
+  gmock
+)
+set_target_properties(unix_list_ports_tests PROPERTIES
+  CXX_STANDARD 11
+  CXX_STANDARD_REQUIRED ON
+  CXX_EXTENSIONS NO
+)
+add_test(NAME unix_list_ports_tests
+  COMMAND unix_list_ports_tests
+)

@@ -46,12 +46,12 @@ std::vector<std::string> PortInfo::glob(const std::vector<std::string> &patterns
   return paths_found;
 }
 
-void PortInfo::getPortInfo(const std::string &serial_port) {
+int PortInfo::getPortInfo(const std::string &serial_port) {
   std::smatch serial_port_match;
   std::regex_match(serial_port, serial_port_match, std::regex("^/dev/([^/]+)/?$"));
   if (serial_port_match.size() != 2) {
     //TODO: wrong serial port name
-    return;
+    return -1;
   }
   std::string serial_port_name(serial_port_match[1]);
 
@@ -59,7 +59,7 @@ void PortInfo::getPortInfo(const std::string &serial_port) {
   std::string system_path("/sys/class/tty/" + serial_port_name);
   if (::lstat(system_path.c_str(), &serial_port_stat) == -1) {
     //TODO: device not found in sys
-    return;
+    return -1;
   }
   if (!S_ISLNK(serial_port_stat.st_mode)) {
     system_path = "/sys/class/tty/" + serial_port_name + "/device";
@@ -68,7 +68,7 @@ void PortInfo::getPortInfo(const std::string &serial_port) {
   ssize_t link_length = ::readlink(system_path.c_str(), link_path, sizeof(link_path) - 1);
   if (link_length == -1) {
     //TODO: link read error
-    return;
+    return -1;
   }
   link_path[link_length] = '\0';
 
@@ -92,6 +92,7 @@ void PortInfo::getPortInfo(const std::string &serial_port) {
   }
 
   this->serial_port = serial_port;
+  return 0;
 }
 
 std::vector<PortInfo> serial::list_ports() {

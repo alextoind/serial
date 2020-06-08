@@ -747,7 +747,7 @@ class PortInfo {
   static std::vector<std::string> glob(const std::vector<std::string> &patterns);
 
 //FIXME private:
-  void getPortInfo(const std::string &sysfs_path);
+  int getPortInfo(const std::string &serial_port);
 #endif
 };
 
