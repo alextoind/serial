@@ -735,10 +735,10 @@ class PortInfo {
   /*! Address of the serial port (this can be passed to the constructor of Serial). */
   std::string serial_port;
 
-  uint16_t busnum;
-  uint16_t devnum;
-  uint16_t id_product;
-  uint16_t id_vendor;
+  uint16_t busnum {0};
+  uint16_t devnum {0};
+  uint16_t id_product {0};
+  uint16_t id_vendor {0};
   std::string manufacturer;
   std::string product;
   std::string serial_number;
