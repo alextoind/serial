@@ -2,15 +2,19 @@ cmake_minimum_required(VERSION 3.5.1 FATAL_ERROR)
 project(Serial VERSION 2.0.0 LANGUAGES CXX)
 
 if(APPLE)
-  #TODO: check if both are required and if find_package instead of find_library works
-  find_package(IOKit REQUIRED)
-  find_package(Foundation REQUIRED)
+  find_library(COREFOUNDATION_LIBRARY CoreFoundation)
+  if (NOT COREFOUNDATION_LIBRARY)
+    message(FATAL_ERROR "CoreFoundation framework not found.")
+  endif()
+  find_library(IOKIT_LIBRARY IOKit)
+  if (NOT IOKIT_LIBRARY)
+    message(FATAL_ERROR "IOKit framework not found.")
+  endif()
 elseif(UNIX)
 #  find_package(rt REQUIRED)  #FIXME: not as package or module
 #  find_package(Threads REQUIRED)  #TODO: seems no longer required
 elseif(WIN32)
-  #TODO: check if it is required and if find_package works
-  find_package(setupapi REQUIRED)
+  # noting to fetch
 else()
   message(FATAL_ERROR "Not supported platform.")
 endif()
@@ -29,8 +33,8 @@ if(APPLE)
     src/impl/list_ports/list_ports_osx.cc
   )
   target_link_libraries(Serial PRIVATE
-    IOKit
-    Foundation
+    "-framework CoreFoundation"
+    "-framework IOKit"
   )
 elseif(UNIX)
   target_sources(Serial PRIVATE
@@ -51,6 +55,13 @@ else()  # already asserted WIN32 during find_package block
     setupapi
   )
 endif()
+# target_compile_features(Serial PUBLIC cxx_std_11) is available only from CMake 3.8
+set_target_properties(Serial PROPERTIES
+  CXX_STANDARD 11
+  CXX_STANDARD_REQUIRED ON
+  CXX_EXTENSIONS NO
+)
+add_library(Serial::Serial ALIAS Serial)
 
 install(TARGETS Serial EXPORT SerialTargets
   LIBRARY DESTINATION lib
@@ -86,10 +97,19 @@ add_executable(unix_serial_tests
   tests/unix_serial_tests.cc
 )
 target_link_libraries(unix_serial_tests PRIVATE
-  Serial
+  Serial::Serial
   GTest::GTest
   GTest::Main
+)
+if(UNIX)
+target_link_libraries(unix_serial_tests PRIVATE
   util  #FIXME: this is just to use the already existing tests
+)
+endif()
+set_target_properties(unix_serial_tests PROPERTIES
+  CXX_STANDARD 11
+  CXX_STANDARD_REQUIRED ON
+  CXX_EXTENSIONS NO
 )
 add_test(NAME unix_serial_tests
   COMMAND unix_serial_tests
@@ -99,23 +119,15 @@ add_executable(unix_timer_tests
   tests/unix_timer_tests.cc
 )
 target_link_libraries(unix_timer_tests PRIVATE
-  Serial
+  Serial::Serial
   GTest::GTest
   GTest::Main
+)
+set_target_properties(unix_timer_tests PROPERTIES
+  CXX_STANDARD 11
+  CXX_STANDARD_REQUIRED ON
+  CXX_EXTENSIONS NO
 )
 add_test(NAME unix_timer_tests
   COMMAND unix_timer_tests
-)
-
-add_executable(unix_list_ports_tests
-  tests/unix_list_ports_tests.cc
-)
-target_link_libraries(unix_list_ports_tests PRIVATE
-  Serial
-  GTest::GTest
-  GTest::Main
-  gmock
-)
-add_test(NAME unix_list_ports_tests
-  COMMAND unix_list_ports_tests
 )
