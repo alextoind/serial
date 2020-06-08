@@ -159,7 +159,7 @@ string rtrim(const string &str) {
   return result;
 }
 
-vector<PortInfo> serial::list_ports(void) {
+vector<PortInfo> list_ports(void) {
   vector<PortInfo> devices_found;
   CFMutableDictionaryRef classes_to_match;
   io_iterator_t serial_port_iterator;
@@ -193,34 +193,12 @@ vector<PortInfo> serial::list_ports(void) {
     }
 
     PortInfo port_info;
-    port_info.port = device_path;
-    port_info.description = "n/a";
-    port_info.hardware_id = "n/a";
-
-    string device_name = rtrim(get_string_property(parent, "USB Product Name"));
-    string vendor_name = rtrim(get_string_property(parent, "USB Vendor Name"));
-    string description = rtrim(vendor_name + " " + device_name);
-    if (!description.empty()) {
-      port_info.description = description;
-    }
-
-    string serial_number = rtrim(get_string_property(parent, "USB Serial Number"));
-    uint16_t vendor_id = get_int_property(parent, "idVendor");
-    uint16_t product_id = get_int_property(parent, "idProduct");
-
-    if (vendor_id && product_id) {
-      char cstring[HARDWARE_ID_STRING_LENGTH];
-
-      if (serial_number.empty()) {
-        serial_number = "None";
-      }
-
-      int ret = snprintf(cstring, HARDWARE_ID_STRING_LENGTH, "USB VID:PID=%04x:%04x SNR=%s", vendor_id, product_id, serial_number.c_str());
-      if ((ret >= 0) && (ret < HARDWARE_ID_STRING_LENGTH)) {
-        port_info.hardware_id = cstring;
-      }
-    }
-
+    port_info.id_product = get_int_property(parent, "idProduct");
+    port_info.id_vendor = get_int_property(parent, "idVendor");
+    port_info.manufacturer = rtrim(get_string_property(parent, "USB Vendor Name"));
+    port_info.product = rtrim(get_string_property(parent, "USB Product Name"));
+    port_info.serial_number = rtrim(get_string_property(parent, "USB Serial Number"));
+    port_info.serial_port = device_path;
     devices_found.push_back(port_info);
   }
 

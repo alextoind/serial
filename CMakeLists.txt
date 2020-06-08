@@ -30,7 +30,7 @@ target_include_directories(Serial PUBLIC
 if(APPLE)
   target_sources(Serial PRIVATE
     src/impl/impl_unix.cc
-    src/impl/list_ports/list_ports_osx.cc
+    src/impl/list_ports/list_ports_macos.cc
   )
   target_link_libraries(Serial PRIVATE
     "-framework CoreFoundation"

@@ -31,7 +31,7 @@ std::string utf8_encode(const std::wstring &wstr) {
   return strTo;
 }
 
-vector<PortInfo> serial::list_ports() {
+vector<PortInfo> list_ports() {
   vector<PortInfo> devices_found;
   HDEVINFO device_info_set = SetupDiGetClassDevs((const GUID *)&GUID_DEVCLASS_PORTS, NULL, NULL, DIGCF_PRESENT);
   unsigned int device_info_set_index = 0;
@@ -99,11 +99,15 @@ vector<PortInfo> serial::list_ports() {
     std::string hardwareId = hardware_id;
 #endif
 
-    PortInfo port_entry;
-    port_entry.port = portName;
-    port_entry.description = friendlyName;
-    port_entry.hardware_id = hardwareId;
-    devices_found.push_back(port_entry);
+    PortInfo port_info;
+    //FIXME
+    //port_info.id_product = get_int_property(parent, "idProduct");
+    //port_info.id_vendor = get_int_property(parent, "idVendor");
+    //port_info.manufacturer = rtrim(get_string_property(parent, "USB Vendor Name"));
+    //port_info.product = rtrim(get_string_property(parent, "USB Product Name"));
+    //port_info.serial_number = rtrim(get_string_property(parent, "USB Serial Number"));
+    port_info.serial_port = portName;
+    devices_found.push_back(port_info);
   }
 
   SetupDiDestroyDeviceInfoList(device_info_set);
