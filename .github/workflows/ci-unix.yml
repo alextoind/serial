@@ -1,21 +1,21 @@
-name: CMake-CI
+name: CMake-CI-Unix
 
 on:
   push:
-    branches: [ master, develop ]
+    branches: [master, develop]
   pull_request:
-    branches: [ master, develop ]
+    branches: [master, develop]
 
 env:
   BUILD_TYPE: Release
 
 jobs:
   build:
-    name: Test on ${{ matrix.os }}
-    runs-on: ${{ matrix.os }}
+    name: Test on ${{matrix.os}}
+    runs-on: ${{matrix.os}}
     strategy:
       matrix:
-        os: [ubuntu-16.04, ubuntu-18.04, ubuntu-20.04, windows-latest, macos-latest]
+        os: [ubuntu-16.04, ubuntu-18.04, ubuntu-20.04, macos-latest]
 
     steps:
     - name: Clone GTest
@@ -36,12 +36,7 @@ jobs:
     - name: Install GTest
       shell: bash
       working-directory: ${{runner.workspace}}/googletest/build
-      run: cmake --build . --config $BUILD_TYPE --target install || sudo cmake --build . --config $BUILD_TYPE --target install
-
-    - name: Export CMAKE_PREFIX_PATH on Windows
-      shell: bash
-      if: runner.os == 'Windows'
-      run: echo '::set-env name=CMAKE_PREFIX_PATH::C:/Program Files (x86)/googletest-distribution'
+      run: sudo cmake --build . --config $BUILD_TYPE --target install
 
     - name: Checkout
       uses: actions/checkout@v2
@@ -54,17 +49,12 @@ jobs:
     - name: Configure CMake
       shell: bash
       working-directory: ${{runner.workspace}}/serial/build
-      run: cmake .. -DCMAKE_BUILD_TYPE=$BUILD_TYPE -DCMAKE_WINDOWS_EXPORT_ALL_SYMBOLS=ON -DBUILD_SHARED_LIBS=ON
+      run: cmake .. -DCMAKE_BUILD_TYPE=$BUILD_TYPE -DBUILD_SHARED_LIBS=ON
 
     - name: Build
       shell: bash
       working-directory: ${{runner.workspace}}/serial/build
-      run: cmake --build . --config $BUILD_TYPE --target install || sudo cmake --build . --config $BUILD_TYPE --target install
-
-    - name: Copy GTest .dll in Release on Windows
-      shell: bash
-      if: runner.os == 'Windows'
-      run: cmake -E copy_directory "$CMAKE_PREFIX_PATH/bin" "${{runner.workspace}}/serial/build/Release"
+      run: sudo cmake --build . --config $BUILD_TYPE --target install
 
     - name: Test
       shell: bash

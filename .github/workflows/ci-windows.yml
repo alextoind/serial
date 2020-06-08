@@ -1,0 +1,72 @@
+name: CMake-CI-Windows
+
+on:
+  push:
+    branches: [master, develop]
+  pull_request:
+    branches: [master, develop]
+
+env:
+  BUILD_TYPE: Release
+
+jobs:
+  build:
+    name: Test on ${{matrix.os}}
+    runs-on: ${{matrix.os}}
+    strategy:
+      matrix:
+        os: [windows-latest]
+
+    steps:
+    - name: Clone GTest
+      shell: bash
+      working-directory: ${{runner.workspace}}
+      run: git clone https://github.com/google/googletest.git
+
+    - name: Create GTest Build Environment
+      shell: bash
+      working-directory: ${{runner.workspace}}/googletest
+      run: cmake -E make_directory build
+
+    - name: Configure GTest CMake
+      shell: bash
+      working-directory: ${{runner.workspace}}/googletest/build
+      run: cmake .. -DBUILD_SHARED_LIBS=ON
+
+    - name: Install GTest
+      shell: bash
+      working-directory: ${{runner.workspace}}/googletest/build
+      run: cmake --build . --config $BUILD_TYPE --target install
+
+    - name: Export CMAKE_PREFIX_PATH
+      shell: bash
+      if: runner.os == 'Windows'
+      run: echo '::set-env name=CMAKE_PREFIX_PATH::C:/Program Files (x86)/googletest-distribution'
+
+    - name: Checkout
+      uses: actions/checkout@v2
+
+    - name: Create Build Environment
+      shell: bash
+      working-directory: ${{runner.workspace}}/serial
+      run: cmake -E make_directory build
+
+    - name: Configure CMake
+      shell: bash
+      working-directory: ${{runner.workspace}}/serial/build
+      run: cmake .. -DCMAKE_WINDOWS_EXPORT_ALL_SYMBOLS=ON -DBUILD_SHARED_LIBS=ON
+
+    - name: Build
+      shell: bash
+      working-directory: ${{runner.workspace}}/serial/build
+      run: cmake --build . --config $BUILD_TYPE --target install
+
+    - name: Copy GTest .dll in $BUILD_TYPE
+      shell: bash
+      if: runner.os == 'Windows'
+      run: cmake -E copy_directory "$CMAKE_PREFIX_PATH/bin" "${{runner.workspace}}/serial/build/$BUILD_TYPE"
+
+    - name: Test
+      shell: bash
+      working-directory: ${{runner.workspace}}/serial/build
+      run: ctest -C $BUILD_TYPE
