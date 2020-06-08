@@ -6,6 +6,7 @@ using namespace serial;
 
 namespace {
 
+#if defined(__linux__)
 TEST(ListSerialPorts, PortsList) {
   std::vector<std::string> serial_port_names;
   int serial_port_names_retrieved = getPortsList(serial_port_names);
@@ -50,6 +51,11 @@ TEST(ListSerialPorts, PortInfo) {
     ASSERT_EQ(serial_port.serial_number, "");
     ASSERT_EQ(serial_port.serial_port, "");
   }
+}
+#endif
+
+TEST(timer_tests, dummy) {
+  ASSERT_TRUE(true);
 }
 
 }
