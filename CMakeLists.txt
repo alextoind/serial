@@ -132,6 +132,7 @@ add_test(NAME unix_timer_tests
   COMMAND unix_timer_tests
 )
 
+if(UNIX AND NOT APPLE)
 add_executable(unix_list_ports_tests
   tests/unix_list_ports_tests.cc
 )
@@ -149,3 +150,4 @@ set_target_properties(unix_list_ports_tests PROPERTIES
 add_test(NAME unix_list_ports_tests
   COMMAND unix_list_ports_tests
 )
+endif()
