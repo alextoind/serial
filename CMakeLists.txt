@@ -91,15 +91,15 @@ install(
 
 # Tests
 enable_testing()
-find_package(GTest REQUIRED)
+find_package(GTest REQUIRED CONFIG)
 
 add_executable(unix_serial_tests
   tests/unix_serial_tests.cc
 )
 target_link_libraries(unix_serial_tests PRIVATE
   Serial::Serial
-  GTest::GTest
-  GTest::Main
+  GTest::gtest
+  GTest::gtest_main
 )
 if(UNIX)
 target_link_libraries(unix_serial_tests PRIVATE
@@ -120,8 +120,8 @@ add_executable(unix_timer_tests
 )
 target_link_libraries(unix_timer_tests PRIVATE
   Serial::Serial
-  GTest::GTest
-  GTest::Main
+  GTest::gtest
+  GTest::gtest_main
 )
 set_target_properties(unix_timer_tests PROPERTIES
   CXX_STANDARD 11
@@ -132,15 +132,14 @@ add_test(NAME unix_timer_tests
   COMMAND unix_timer_tests
 )
 
-if(UNIX AND NOT APPLE)
 add_executable(unix_list_ports_tests
   tests/unix_list_ports_tests.cc
 )
 target_link_libraries(unix_list_ports_tests PRIVATE
   Serial::Serial
-  GTest::GTest
-  GTest::Main
-  gmock
+  GTest::gtest
+  GTest::gmock
+  GTest::gtest_main
 )
 set_target_properties(unix_list_ports_tests PROPERTIES
   CXX_STANDARD 11
@@ -150,4 +149,3 @@ set_target_properties(unix_list_ports_tests PROPERTIES
 add_test(NAME unix_list_ports_tests
   COMMAND unix_list_ports_tests
 )
-endif()

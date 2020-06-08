@@ -59,4 +59,4 @@ jobs:
     - name: Test
       shell: bash
       working-directory: ${{runner.workspace}}/serial/build
-      run: ctest -C $BUILD_TYPE
+      run: ctest -C $BUILD_TYPE --output-on-failure
