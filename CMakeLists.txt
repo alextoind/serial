@@ -84,11 +84,13 @@ set_target_properties(Serial PROPERTIES
 )
 add_library(Serial::Serial ALIAS Serial)
 
+install(DIRECTORY include/serial
+  DESTINATION include
+)
 install(TARGETS Serial EXPORT SerialTargets
   LIBRARY DESTINATION lib
   ARCHIVE DESTINATION lib
   RUNTIME DESTINATION bin
-  INCLUDES DESTINATION include
 )
 install(EXPORT SerialTargets
   FILE SerialTargets.cmake
