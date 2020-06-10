@@ -736,9 +736,9 @@ class PortInfo {
 
 #if defined(__linux__)
 int getLinkPath(std::string system_path, std::string &link_path);
+#endif
 int getPortsInfo(std::vector<PortInfo> &serial_ports);
 int getPortsList(std::vector<std::string> &serial_port_names);
-#endif
 } // namespace serial
 
 #endif
