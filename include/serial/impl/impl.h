@@ -22,26 +22,29 @@
 #ifndef SERIAL_IMPL_H
 #define SERIAL_IMPL_H
 
-#include "serial/serial.h"
+#include <serial/serial.h>
 
 #if !defined(_WIN32)
-#include <pthread.h>
+#include <fcntl.h>
+#include <sys/ioctl.h>
+#include <termios.h>
+#include <unistd.h>
+
+#if defined(__linux__)
+#include <linux/serial.h>
+#elif defined(__MACH__)
+#include <AvailabilityMacros.h>
+#include <mach/clock.h>
+#include <mach/mach.h>
+#if defined(MAC_OS_X_VERSION_10_3) && (MAC_OS_X_VERSION_MIN_REQUIRED >= MAC_OS_X_VERSION_10_3)
+#include <IOKit/serial/ioss.h>
+#endif
+#endif
 #else
-#include "windows.h"
+#include <windows.h>
 #endif
 
 namespace serial {
-
-#if !defined(_WIN32)
-using std::size_t;
-#else
-using std::wstring;
-#endif
-using std::string;
-using std::invalid_argument;
-
-using serial::SerialException;
-using serial::IOException;
 
 #if !defined(_WIN32)
 class MillisecondTimer {
@@ -57,7 +60,7 @@ class MillisecondTimer {
 
 class Serial::SerialImpl {
  public:
-  SerialImpl(const string &port, unsigned long baudrate, bytesize_t bytesize, parity_t parity, stopbits_t stopbits,
+  SerialImpl(const std::string &port, unsigned long baudrate, bytesize_t bytesize, parity_t parity, stopbits_t stopbits,
              flowcontrol_t flowcontrol);
 
   virtual ~SerialImpl();
@@ -102,9 +105,9 @@ class Serial::SerialImpl {
 
   bool getCD();
 
-  void setPort(const string &port);
+  void setPort(const std::string &port);
 
-  string getPort() const;
+  std::string getPort() const;
 
   void setTimeout(Timeout &timeout);
 
@@ -143,10 +146,10 @@ class Serial::SerialImpl {
 
  private:
 #if !defined(_WIN32)
-  string port_;               // Path to the file descriptor
+  std::string port_;               // Path to the file descriptor
   int fd_;                    // The current file descriptor
 #else
-  wstring port_;               // Path to the file descriptor
+  std::wstring port_;               // Path to the file descriptor
   HANDLE fd_;
 #endif
 

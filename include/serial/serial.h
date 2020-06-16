@@ -22,31 +22,11 @@
 #ifndef SERIAL_H
 #define SERIAL_H
 
-#include <limits>
-#include <vector>
-#include <string>
-#include <cstddef>
-#include <cstdio>
 #include <cstring>
+#include <limits>
 #include <sstream>
-#include <exception>
-#include <stdexcept>
-
-// Copyright 2012 the V8 project authors. All rights reserved.
-//TODO: give it a shot on windows to see if it is still necessary in 2020
-#if defined(_WIN32) && !defined(__MINGW32__)
-typedef signed char int8_t;
-typedef unsigned char uint8_t;
-typedef short int16_t;  // NOLINT
-typedef unsigned short uint16_t;  // NOLINT
-typedef int int32_t;
-typedef unsigned int uint32_t;
-typedef __int64 int64_t;
-typedef unsigned __int64 uint64_t;
-// intptr_t and friends are defined in crtdefs.h through stdio.h.
-#else
-#include <cstdint>
-#endif
+#include <string>
+#include <vector>
 
 #define THROW(exceptionClass, message) throw exceptionClass(__FILE__, \
 __LINE__, (message) )

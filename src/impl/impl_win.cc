@@ -21,33 +21,19 @@
 
 #if defined(_WIN32)
 
-#include <sstream>
+#include <serial/impl/impl.h>
 
-#include "serial/impl/impl.h"
+using namespace serial;
 
-using std::string;
-using std::wstring;
-using std::stringstream;
-using std::invalid_argument;
-using serial::Serial;
-using serial::Timeout;
-using serial::bytesize_t;
-using serial::parity_t;
-using serial::stopbits_t;
-using serial::flowcontrol_t;
-using serial::SerialException;
-using serial::PortNotOpenedException;
-using serial::IOException;
-
-inline wstring _prefix_port_if_needed(const wstring &input) {
-  static wstring windows_com_port_prefix = L"\\\\.\\";
+inline std::wstring _prefix_port_if_needed(const std::wstring &input) {
+  static std::wstring windows_com_port_prefix = L"\\\\.\\";
   if (input.compare(windows_com_port_prefix) != 0) {
     return windows_com_port_prefix + input;
   }
   return input;
 }
 
-Serial::SerialImpl::SerialImpl(const string &port, unsigned long baudrate, bytesize_t bytesize, parity_t parity,
+Serial::SerialImpl::SerialImpl(const std::string &port, unsigned long baudrate, bytesize_t bytesize, parity_t parity,
                                stopbits_t stopbits, flowcontrol_t flowcontrol)
     : port_(port.begin(), port.end()),
       fd_(INVALID_HANDLE_VALUE),
@@ -72,20 +58,20 @@ Serial::SerialImpl::~SerialImpl() {
 
 void Serial::SerialImpl::open() {
   if (port_.empty()) {
-    throw invalid_argument("Empty port is invalid.");
+    throw std::invalid_argument("Empty port is invalid.");
   }
   if (is_open_ == true) {
     throw SerialException("Serial port already open.");
   }
 
   // See: https://github.com/wjwwood/serial/issues/84
-  wstring port_with_prefix = _prefix_port_if_needed(port_);
+  std::wstring port_with_prefix = _prefix_port_if_needed(port_);
   LPCWSTR lp_port = port_with_prefix.c_str();
   fd_ = CreateFileW(lp_port, GENERIC_READ | GENERIC_WRITE, 0, 0, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, 0);
 
   if (fd_ == INVALID_HANDLE_VALUE) {
     DWORD create_file_err = GetLastError();
-    stringstream ss;
+    std::stringstream ss;
     switch (create_file_err) {
       case ERROR_FILE_NOT_FOUND:
         // Use this->getPort to convert to a std::string
@@ -270,7 +256,7 @@ void Serial::SerialImpl::reconfigurePort() {
   } else if (bytesize_ == fivebits) {
     dcbSerialParams.ByteSize = 5;
   } else {
-    throw invalid_argument("invalid char len");
+    throw std::invalid_argument("invalid char len");
   }
 
   // setup stopbits
@@ -281,7 +267,7 @@ void Serial::SerialImpl::reconfigurePort() {
   } else if (stopbits_ == stopbits_two) {
     dcbSerialParams.StopBits = TWOSTOPBITS;
   } else {
-    throw invalid_argument("invalid stop bit");
+    throw std::invalid_argument("invalid stop bit");
   }
 
   // setup parity
@@ -296,7 +282,7 @@ void Serial::SerialImpl::reconfigurePort() {
   } else if (parity_ == parity_space) {
     dcbSerialParams.Parity = SPACEPARITY;
   } else {
-    throw invalid_argument("invalid parity");
+    throw std::invalid_argument("invalid parity");
   }
 
   // setup flowcontrol
@@ -343,7 +329,7 @@ void Serial::SerialImpl::close() {
       int ret;
       ret = CloseHandle(fd_);
       if (ret == 0) {
-        stringstream ss;
+        std::stringstream ss;
         ss << "Error while closing serial port: " << GetLastError();
         THROW (IOException, ss.str().c_str());
       } else {
@@ -364,7 +350,7 @@ size_t Serial::SerialImpl::available() {
   }
   COMSTAT cs;
   if (!ClearCommError(fd_, NULL, &cs)) {
-    stringstream ss;
+    std::stringstream ss;
     ss << "Error while checking status of the serial port: " << GetLastError();
     THROW (IOException, ss.str().c_str());
   }
@@ -386,7 +372,7 @@ size_t Serial::SerialImpl::read(uint8_t *buf, size_t size) {
   }
   DWORD bytes_read;
   if (!ReadFile(fd_, buf, static_cast<DWORD>(size), &bytes_read, NULL)) {
-    stringstream ss;
+    std::stringstream ss;
     ss << "Error while reading from the serial port: " << GetLastError();
     THROW (IOException, ss.str().c_str());
   }
@@ -399,19 +385,19 @@ size_t Serial::SerialImpl::write(const uint8_t *data, size_t length) {
   }
   DWORD bytes_written;
   if (!WriteFile(fd_, data, static_cast<DWORD>(length), &bytes_written, NULL)) {
-    stringstream ss;
+    std::stringstream ss;
     ss << "Error while writing to the serial port: " << GetLastError();
     THROW (IOException, ss.str().c_str());
   }
   return (size_t)(bytes_written);
 }
 
-void Serial::SerialImpl::setPort(const string &port) {
-  port_ = wstring(port.begin(), port.end());
+void Serial::SerialImpl::setPort(const std::string &port) {
+  port_ = std::wstring(port.begin(), port.end());
 }
 
-string Serial::SerialImpl::getPort() const {
-  return string(port_.begin(), port_.end());
+std::string Serial::SerialImpl::getPort() const {
+  return std::string(port_.begin(), port_.end());
 }
 
 void Serial::SerialImpl::setTimeout(serial::Timeout &timeout) {
@@ -631,5 +617,4 @@ void Serial::SerialImpl::writeUnlock() {
   }
 }
 
-#endif // #if defined(_WIN32)
-
+#endif  // defined(_WIN32)
