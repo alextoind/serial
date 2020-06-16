@@ -24,7 +24,9 @@
 
 #include <serial/serial.h>
 
-#if !defined(_WIN32)
+#if defined(_WIN32)
+#include <windows.h>
+#else
 #include <fcntl.h>
 #include <sys/ioctl.h>
 #include <termios.h>
@@ -39,9 +41,15 @@
 #if defined(MAC_OS_X_VERSION_10_3) && (MAC_OS_X_VERSION_MIN_REQUIRED >= MAC_OS_X_VERSION_10_3)
 #include <IOKit/serial/ioss.h>
 #endif
-#endif
+//TODO: check if it works properly on macOS
+#ifndef TIOCINQ
+#ifdef FIONREAD
+#define TIOCINQ FIONREAD
 #else
-#include <windows.h>
+#define TIOCINQ 0x541B
+#endif
+#endif
+#endif
 #endif
 
 namespace serial {
