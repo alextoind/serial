@@ -592,12 +592,6 @@ class Serial {
   // Scoped Lock Classes
   class ScopedReadLock;
   class ScopedWriteLock;
-
-  // Read common function
-  size_t read_(uint8_t *buffer, size_t size);
-
-  // Write common function
-  size_t write_(const uint8_t *data, size_t length);
 };
 
 class SerialException : public std::exception {
