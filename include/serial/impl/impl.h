@@ -141,14 +141,6 @@ class Serial::SerialImpl {
 
   flowcontrol_t getFlowcontrol() const;
 
-  void readLock();
-
-  void readUnlock();
-
-  void writeLock();
-
-  void writeUnlock();
-
  protected:
   void reconfigurePort();
 
@@ -177,15 +169,6 @@ class Serial::SerialImpl {
   bytesize_t bytesize_;       // Size of the bytes
   stopbits_t stopbits_;       // Stop Bits
   flowcontrol_t flowcontrol_; // Flow Control
-
-  // Mutex used to lock the read and write functions
-#if !defined(_WIN32)
-  pthread_mutex_t read_mutex;
-  pthread_mutex_t write_mutex;
-#else
-  HANDLE read_mutex;
-  HANDLE write_mutex;
-#endif
 };
 }  // namespace serial
 

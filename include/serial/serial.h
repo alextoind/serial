@@ -24,6 +24,7 @@
 
 #include <cstring>
 #include <limits>
+#include <mutex>
 #include <sstream>
 #include <string>
 #include <vector>
@@ -589,9 +590,8 @@ class Serial {
   class SerialImpl;
   SerialImpl *pimpl_;
 
-  // Scoped Lock Classes
-  class ScopedReadLock;
-  class ScopedWriteLock;
+  std::mutex read_mutex_;
+  std::mutex write_mutex_;
 };
 
 class SerialException : public std::exception {
