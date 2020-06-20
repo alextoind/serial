@@ -22,6 +22,7 @@
 #ifndef SERIAL_H
 #define SERIAL_H
 
+#include <chrono>
 #include <cstring>
 #include <limits>
 #include <sstream>

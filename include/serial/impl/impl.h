@@ -81,7 +81,7 @@ class Serial::SerialImpl {
 
   size_t available();
 
-  bool waitReadable(uint32_t timeout);
+  bool waitReadable(uint32_t timeout_ms);
 
   void waitByteTimes(size_t count);
 

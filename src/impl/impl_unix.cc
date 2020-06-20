@@ -60,11 +60,10 @@ timespec MillisecondTimer::timespec_now() {
   return time;
 }
 
-timespec timespec_from_ms(const uint32_t millis) {
-  timespec time;
-  time.tv_sec = millis / 1e3;
-  time.tv_nsec = (millis - (time.tv_sec * 1e3)) * 1e6;
-  return time;
+template<typename T>
+timespec getTimeSpec(std::chrono::duration<int64_t, T> duration) {
+  using namespace std::chrono;
+  return {duration_cast<seconds>(duration).count(), (duration_cast<nanoseconds>(duration) - duration_cast<seconds>(duration)).count()};
 }
 
 Serial::SerialImpl::SerialImpl(const std::string &port, unsigned long baudrate, bytesize_t bytesize, parity_t parity,
@@ -525,13 +524,13 @@ size_t Serial::SerialImpl::available() {
   }
 }
 
-bool Serial::SerialImpl::waitReadable(uint32_t timeout) {
+bool Serial::SerialImpl::waitReadable(uint32_t timeout_ms) {
   // Setup a select call to block for serial data or a timeout
   fd_set readfds;
   FD_ZERO (&readfds);
   FD_SET (fd_, &readfds);
-  timespec timeout_ts(timespec_from_ms(timeout));
-  int r = pselect(fd_ + 1, &readfds, nullptr, nullptr, &timeout_ts, nullptr);
+  timespec timeout = getTimeSpec(std::chrono::milliseconds(timeout_ms));
+  int r = pselect(fd_ + 1, &readfds, nullptr, nullptr, &timeout, nullptr);
 
   if (r < 0) {
     // Select was interrupted
@@ -651,12 +650,9 @@ size_t Serial::SerialImpl::write(const uint8_t *data, size_t length) {
     }
     first_iteration = false;
 
-    timespec timeout(timespec_from_ms(timeout_remaining_ms));
-
     FD_ZERO (&writefds);
     FD_SET (fd_, &writefds);
-
-    // Do the select
+    timespec timeout = getTimeSpec(std::chrono::milliseconds(timeout_remaining_ms));
     int r = pselect(fd_ + 1, nullptr, &writefds, nullptr, &timeout, nullptr);
 
     // Figure out what happened by looking at select's response 'r'
