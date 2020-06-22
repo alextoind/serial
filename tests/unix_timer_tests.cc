@@ -19,68 +19,68 @@
  *  SOFTWARE.
  */
 
-#include "gtest/gtest.h"
-#include "serial/impl/impl.h"
+#include <gtest/gtest.h>
+#include <serial/serial.h>
+#include <thread>
 
-#if defined(__linux__)
-#include <unistd.h>
-#include <stdlib.h>
-
-using serial::MillisecondTimer;
-#endif
+using namespace serial;
 
 namespace {
 
 #if defined(__linux__)
-/**
- * Do 100 trials of timing gaps between 0 and 19 milliseconds.
- * Expect accuracy within one millisecond.
- */
-TEST(timer_tests, short_intervals) {
-  for (int trial = 0; trial < 100; trial++)
-  {
-    uint32_t ms = rand() % 20;
-    MillisecondTimer mt(ms);
-    usleep(1000 * ms);
-    int32_t r = mt.remaining(); 
-
-    // 1ms slush, for the cost of calling usleep.
-    EXPECT_NEAR(r+1, 0, 1);
+class TimeoutTests : public ::testing::Test {
+ protected:
+  void SetUp() override {
+    simple_timeout = std::unique_ptr<Serial::Timeout>(new Serial::Timeout(25));
+    complete_timeout = std::unique_ptr<Serial::Timeout>(new Serial::Timeout(0, 10, 20, 100, 0));
   }
+
+  static std::chrono::milliseconds cycleRead(const std::unique_ptr<Serial::Timeout> &timeout, const int &cycles, const size_t &multiplier) {
+    std::chrono::milliseconds remaining_time(0);
+    for (int i=0; i<cycles; i++) {
+      auto read_deadline = timeout->getReadDeadline(multiplier);
+      std::this_thread::sleep_for(timeout->getReadConstant() + timeout->getReadMultiplier() * multiplier);
+      remaining_time += Serial::Timeout::remainingMilliseconds(read_deadline);
+    }
+    return remaining_time;
+  }
+
+  static std::chrono::milliseconds cycleWrite(const std::unique_ptr<Serial::Timeout> &timeout, const int &cycles, const size_t &multiplier) {
+    std::chrono::milliseconds remaining_time(0);
+    for (int i=0; i<cycles; i++) {
+      auto write_deadline = timeout->getWriteDeadline(multiplier);
+      std::this_thread::sleep_for(timeout->getWriteConstant() + timeout->getWriteMultiplier() * multiplier);
+      remaining_time += Serial::Timeout::remainingMilliseconds(write_deadline);
+    }
+    return remaining_time;
+  }
+
+  std::unique_ptr<Serial::Timeout> simple_timeout;
+  std::unique_ptr<Serial::Timeout> complete_timeout;
+};
+
+TEST_F(TimeoutTests, SimpleTimeoutRead) {
+  EXPECT_NEAR(cycleRead(simple_timeout, 8, 0).count(), 0, 2);
+  EXPECT_NEAR(cycleRead(simple_timeout, 8, 10).count(), 0, 2);
 }
 
-TEST(timer_tests, overlapping_long_intervals) {
-  MillisecondTimer* timers[10];
+TEST_F(TimeoutTests, SimpleTimeoutWrite) {
+  EXPECT_NEAR(cycleWrite(simple_timeout, 8, 0).count(), 0, 2);
+  EXPECT_NEAR(cycleWrite(simple_timeout, 8, 10).count(), 0, 2);
+}
 
-  // Experimentally determined. Corresponds to the extra time taken by the loops,
-  // the big usleep, and the test infrastructure itself.
-  const int slush_factor = 14;
+TEST_F(TimeoutTests, CompleteTimeoutRead) {
+  EXPECT_NEAR(cycleRead(complete_timeout, 20, 0).count(), 0, 2);
+  EXPECT_NEAR(cycleRead(complete_timeout, 4, 2).count(), 0, 2);
+}
 
-  // Set up the timers to each time one second, 1ms apart.
-  for (int t = 0; t < 10; t++)
-  {
-    timers[t] = new MillisecondTimer(1000);
-    usleep(1000);
-  }
-
-  // Check in on them after 500ms.
-  usleep(500000);
-  for (int t = 0; t < 10; t++)
-  {
-    EXPECT_NEAR(timers[t]->remaining(), 500 - slush_factor + t, 5);
-  }
-
-  // Check in on them again after another 500ms and free them.
-  usleep(500000);
-  for (int t = 0; t < 10; t++)
-  {
-    EXPECT_NEAR(timers[t]->remaining(), -slush_factor + t, 5);
-    delete timers[t];
-  }
+TEST_F(TimeoutTests, CompleteTimeoutWrite) {
+  EXPECT_NEAR(cycleWrite(complete_timeout, 2, 0).count(), 0, 2);
+  EXPECT_NEAR(cycleWrite(complete_timeout, 2, 1000).count(), 0, 2);
 }
 #endif
 
-TEST(timer_tests, dummy) {
+TEST(DummyTests, Dummy) {
   ASSERT_TRUE(true);
 }
 
