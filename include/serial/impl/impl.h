@@ -54,18 +54,6 @@
 
 namespace serial {
 
-#if !defined(_WIN32)
-class MillisecondTimer {
- public:
-  MillisecondTimer(const uint32_t millis);
-  int64_t remaining();
-
- private:
-  static timespec timespec_now();
-  timespec expiry;
-};
-#endif
-
 class Serial::SerialImpl {
  public:
   SerialImpl(const std::string &port, unsigned long baudrate, bytesize_t bytesize, parity_t parity, stopbits_t stopbits,
@@ -81,7 +69,7 @@ class Serial::SerialImpl {
 
   size_t available();
 
-  bool waitReadable(uint32_t timeout_ms);
+  bool waitReadable(std::chrono::milliseconds timeout_ms);
 
   void waitByteTimes(size_t count);
 

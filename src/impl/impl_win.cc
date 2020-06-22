@@ -313,11 +313,11 @@ void Serial::SerialImpl::reconfigurePort() {
 
   // Setup timeouts
   COMMTIMEOUTS timeouts = {0};
-  timeouts.ReadIntervalTimeout = timeout_.inter_byte_timeout;
-  timeouts.ReadTotalTimeoutConstant = timeout_.read_timeout_constant;
-  timeouts.ReadTotalTimeoutMultiplier = timeout_.read_timeout_multiplier;
-  timeouts.WriteTotalTimeoutConstant = timeout_.write_timeout_constant;
-  timeouts.WriteTotalTimeoutMultiplier = timeout_.write_timeout_multiplier;
+  timeouts.ReadIntervalTimeout = timeout_.getInterByteMilliseconds();
+  timeouts.ReadTotalTimeoutConstant = timeout_.getReadConstantMilliseconds();
+  timeouts.ReadTotalTimeoutMultiplier = timeout_.getReadMultiplierMilliseconds();
+  timeouts.WriteTotalTimeoutConstant = timeout_.getWriteConstantMilliseconds();
+  timeouts.WriteTotalTimeoutMultiplier = timeout_.getWriteMultiplierMilliseconds();
   if (!SetCommTimeouts(fd_, &timeouts)) {
     THROW (IOException, "Error setting timeouts.");
   }
@@ -357,7 +357,7 @@ size_t Serial::SerialImpl::available() {
   return static_cast<size_t>(cs.cbInQue);
 }
 
-bool Serial::SerialImpl::waitReadable(uint32_t /*timeout*/) {
+bool Serial::SerialImpl::waitReadable(std::chrono::milliseconds /*timeout*/) {
   THROW (IOException, "waitReadable is not implemented on Windows.");
   return false;
 }
@@ -400,14 +400,14 @@ std::string Serial::SerialImpl::getPort() const {
   return std::string(port_.begin(), port_.end());
 }
 
-void Serial::SerialImpl::setTimeout(serial::Timeout &timeout) {
+void Serial::SerialImpl::setTimeout(Serial::Timeout &timeout) {
   timeout_ = timeout;
   if (is_open_) {
     reconfigurePort();
   }
 }
 
-serial::Timeout Serial::SerialImpl::getTimeout() const {
+Serial::Timeout Serial::SerialImpl::getTimeout() const {
   return timeout_;
 }
 

@@ -74,62 +74,55 @@ typedef enum {
 } flowcontrol_t;
 
 /*!
- * Structure for setting the timeout of the serial port, times are
- * in milliseconds.
- *
- * In order to disable the interbyte timeout, set it to Timeout::max().
- */
-struct Timeout {
-#ifdef max
-# undef max
-#endif
-  static uint32_t max() {
-    return std::numeric_limits<uint32_t>::max();
-  }
-
-  /*!
-   * Convenience function to generate Timeout structs using a
-   * single absolute timeout.
-   *
-   * \param timeout A long that defines the time in milliseconds until a
-   * timeout occurs after a call to read or write is made.
-   *
-   * \return Timeout struct that represents this simple timeout provided.
-   */
-  static Timeout simpleTimeout(uint32_t timeout) {
-    return Timeout(max(), timeout, 0, timeout, 0);
-  }
-
-  /*! Number of milliseconds between bytes received to timeout on. */
-  uint32_t inter_byte_timeout;
-  /*! A constant number of milliseconds to wait after calling read. */
-  uint32_t read_timeout_constant;
-  /*! A multiplier against the number of requested bytes to wait after
-   *  calling read.
-   */
-  uint32_t read_timeout_multiplier;
-  /*! A constant number of milliseconds to wait after calling write. */
-  uint32_t write_timeout_constant;
-  /*! A multiplier against the number of requested bytes to wait after
-   *  calling write.
-   */
-  uint32_t write_timeout_multiplier;
-
-  explicit Timeout(uint32_t inter_byte_timeout_ = 0, uint32_t read_timeout_constant_ = 0,
-                   uint32_t read_timeout_multiplier_ = 0, uint32_t write_timeout_constant_ = 0,
-                   uint32_t write_timeout_multiplier_ = 0)
-      : inter_byte_timeout(inter_byte_timeout_),
-        read_timeout_constant(read_timeout_constant_),
-        read_timeout_multiplier(read_timeout_multiplier_),
-        write_timeout_constant(write_timeout_constant_),
-        write_timeout_multiplier(write_timeout_multiplier_) {}
-};
-
-/*!
  * Class that provides a portable serial port interface.
  */
 class Serial {
  public:
+  class Timeout {
+   public:
+    Timeout() = default;
+    ~Timeout() = default;
+
+    explicit Timeout(uint32_t read_write_constant)
+        : Timeout(std::numeric_limits<uint32_t>::max(), read_write_constant, 0, read_write_constant, 0) {}
+
+    explicit Timeout(uint32_t inter_byte, uint32_t read_constant, uint32_t read_multiplier, uint32_t write_constant, uint32_t write_multiplier)
+        : inter_byte_(inter_byte),
+          read_constant_(read_constant),
+          read_multiplier_(read_multiplier),
+          write_constant_(write_constant),
+          write_multiplier_(write_multiplier) {}
+
+    std::chrono::milliseconds getInterByte() { return inter_byte_; }
+    uint32_t getInterByteMilliseconds() { return inter_byte_.count(); }
+    std::chrono::milliseconds getReadConstant() { return read_constant_; }
+    uint32_t getReadConstantMilliseconds() { return read_constant_.count(); }
+    std::chrono::milliseconds getReadMultiplier() { return read_multiplier_; }
+    uint32_t getReadMultiplierMilliseconds() { return read_multiplier_.count(); }
+    std::chrono::milliseconds getWriteConstant() { return write_constant_; }
+    uint32_t getWriteConstantMilliseconds() { return write_constant_.count(); }
+    std::chrono::milliseconds getWriteMultiplier() { return write_multiplier_; }
+    uint32_t getWriteMultiplierMilliseconds() { return write_multiplier_.count(); }
+
+    std::chrono::steady_clock::time_point getReadDeadline() { return getReadDeadline(0); }
+    std::chrono::steady_clock::time_point getReadDeadline(const size_t &size) {
+      return std::chrono::steady_clock::now() + read_constant_ + read_multiplier_*size;
+    }
+
+    std::chrono::steady_clock::time_point getWriteDeadline() { return getWriteDeadline(0); }
+    std::chrono::steady_clock::time_point getWriteDeadline(const size_t &size) {
+      return std::chrono::steady_clock::now() + write_constant_ + write_multiplier_*size;
+    }
+
+   private:
+    // the following timeouts in milliseconds refer to COMMTIMEOUTS (https://docs.microsoft.com/en-us/windows/win32/api/winbase/ns-winbase-commtimeouts)
+    std::chrono::duration<uint32_t, std::milli> inter_byte_;
+    std::chrono::duration<uint32_t, std::milli> read_constant_;
+    std::chrono::duration<uint32_t, std::milli> read_multiplier_;
+    std::chrono::duration<uint32_t, std::milli> write_constant_;
+    std::chrono::duration<uint32_t, std::milli> write_multiplier_;
+  };
+
   /*!
    * Creates a Serial object and opens the port if a port is specified,
    * otherwise it remains closed until serial::Serial::open is called.
