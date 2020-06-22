@@ -84,7 +84,8 @@ class Serial {
     ~Timeout() = default;
 
     explicit Timeout(uint32_t read_write_constant)
-        : Timeout(std::numeric_limits<uint32_t>::max(), read_write_constant, 0, read_write_constant, 0) {}
+    // the ugly parentheses around `(std::max)()` are required on Windows (this is to avoid to `#undef max` or to `#define NOMINMAX`)
+        : Timeout((std::numeric_limits<uint32_t>::max)(), read_write_constant, 0, read_write_constant, 0) {}
 
     explicit Timeout(uint32_t inter_byte, uint32_t read_constant, uint32_t read_multiplier, uint32_t write_constant, uint32_t write_multiplier)
         : inter_byte_(inter_byte),
@@ -112,6 +113,10 @@ class Serial {
     std::chrono::steady_clock::time_point getWriteDeadline() { return getWriteDeadline(0); }
     std::chrono::steady_clock::time_point getWriteDeadline(const size_t &size) {
       return std::chrono::steady_clock::now() + write_constant_ + write_multiplier_*size;
+    }
+
+    static std::chrono::milliseconds remainingMilliseconds(std::chrono::steady_clock::time_point deadline) {
+      return std::chrono::duration_cast<std::chrono::milliseconds>(deadline - std::chrono::steady_clock::now());
     }
 
    private:

@@ -540,7 +540,7 @@ size_t Serial::SerialImpl::read(uint8_t *buf, size_t size) {
   }
 
   while (bytes_read < size) {
-    std::chrono::milliseconds remaining_time = std::chrono::duration_cast<std::chrono::milliseconds>(read_deadline - std::chrono::steady_clock::now());
+    auto remaining_time = Timeout::remainingMilliseconds(read_deadline);
     if (remaining_time.count() <= 0) {
       // Timed out
       break;
@@ -599,7 +599,7 @@ size_t Serial::SerialImpl::write(const uint8_t *data, size_t length) {
 
   bool first_iteration = true;
   while (bytes_written < length) {
-    std::chrono::milliseconds remaining_time = std::chrono::duration_cast<std::chrono::milliseconds>(write_deadline - std::chrono::steady_clock::now());
+    auto remaining_time = Timeout::remainingMilliseconds(write_deadline);
     // Only consider the timeout if it's not the first iteration of the loop
     // otherwise a timeout of 0 won't be allowed through
     if (!first_iteration && (remaining_time.count() <= 0)) {
