@@ -27,7 +27,7 @@ using namespace serial;
 
 namespace {
 
-#if !defined(_WIN32)
+#if defined(__linux__)
 class TimeoutTests : public ::testing::Test {
  protected:
   void SetUp() override {
