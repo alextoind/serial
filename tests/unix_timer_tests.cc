@@ -21,12 +21,13 @@
 
 #include <gtest/gtest.h>
 #include <serial/serial.h>
+#include <thread>
 
 using namespace serial;
 
 namespace {
 
-#if defined(__linux__)
+#if !defined(_WIN32)
 class TimeoutTests : public ::testing::Test {
  protected:
   void SetUp() override {
@@ -38,7 +39,7 @@ class TimeoutTests : public ::testing::Test {
     std::chrono::milliseconds remaining_time(0);
     for (int i=0; i<cycles; i++) {
       auto read_deadline = timeout->getReadDeadline(multiplier);
-      usleep(std::chrono::duration_cast<std::chrono::microseconds>(timeout->getReadConstant() + timeout->getReadMultiplier() * multiplier).count());
+      std::this_thread::sleep_for(timeout->getReadConstant() + timeout->getReadMultiplier() * multiplier);
       remaining_time += Serial::Timeout::remainingMilliseconds(read_deadline);
     }
     return remaining_time;
@@ -48,7 +49,7 @@ class TimeoutTests : public ::testing::Test {
     std::chrono::milliseconds remaining_time(0);
     for (int i=0; i<cycles; i++) {
       auto write_deadline = timeout->getWriteDeadline(multiplier);
-      usleep(std::chrono::duration_cast<std::chrono::microseconds>(timeout->getWriteConstant() + timeout->getWriteMultiplier() * multiplier).count());
+      std::this_thread::sleep_for(timeout->getWriteConstant() + timeout->getWriteMultiplier() * multiplier);
       remaining_time += Serial::Timeout::remainingMilliseconds(write_deadline);
     }
     return remaining_time;
