@@ -51,8 +51,8 @@ size_t Serial::available() {
 }
 
 bool Serial::waitReadable() {
-  serial::Timeout timeout(pimpl_->getTimeout());
-  return pimpl_->waitReadable(timeout.read_timeout_constant);
+  Serial::Timeout timeout(pimpl_->getTimeout());
+  return pimpl_->waitReadable(timeout.getReadConstant());
 }
 
 void Serial::waitByteTimes(size_t count) {
@@ -195,11 +195,11 @@ std::string Serial::getPort() const {
   return pimpl_->getPort();
 }
 
-void Serial::setTimeout(serial::Timeout &timeout) {
+void Serial::setTimeout(Serial::Timeout &timeout) {
   pimpl_->setTimeout(timeout);
 }
 
-serial::Timeout Serial::getTimeout() const {
+Serial::Timeout Serial::getTimeout() const {
   return pimpl_->getTimeout();
 }
 

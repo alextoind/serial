@@ -25,46 +25,10 @@
 
 using namespace serial;
 
-MillisecondTimer::MillisecondTimer(const uint32_t millis)
-    : expiry(timespec_now()) {
-  int64_t tv_nsec = expiry.tv_nsec + (millis * 1e6);
-  if (tv_nsec >= 1e9) {
-    int64_t sec_diff = tv_nsec / static_cast<int> (1e9);
-    expiry.tv_nsec = tv_nsec % static_cast<int>(1e9);
-    expiry.tv_sec += sec_diff;
-  } else {
-    expiry.tv_nsec = tv_nsec;
-  }
-}
-
-int64_t MillisecondTimer::remaining() {
-  timespec now(timespec_now());
-  int64_t millis = (expiry.tv_sec - now.tv_sec) * 1e3;
-  millis += (expiry.tv_nsec - now.tv_nsec) / 1e6;
-  return millis;
-}
-
-timespec MillisecondTimer::timespec_now() {
-  timespec time;
-# ifdef __MACH__ // OS X does not have clock_gettime, use clock_get_time
-  clock_serv_t cclock;
-  mach_timespec_t mts;
-  host_get_clock_service(mach_host_self(), SYSTEM_CLOCK, &cclock);
-  clock_get_time(cclock, &mts);
-  mach_port_deallocate(mach_task_self(), cclock);
-  time.tv_sec = mts.tv_sec;
-  time.tv_nsec = mts.tv_nsec;
-# else
-  clock_gettime(CLOCK_MONOTONIC, &time);
-# endif
-  return time;
-}
-
-timespec timespec_from_ms(const uint32_t millis) {
-  timespec time;
-  time.tv_sec = millis / 1e3;
-  time.tv_nsec = (millis - (time.tv_sec * 1e3)) * 1e6;
-  return time;
+template<typename T>
+timespec getTimeSpec(std::chrono::duration<int64_t, T> duration) {
+  using namespace std::chrono;
+  return {duration_cast<seconds>(duration).count(), (duration_cast<nanoseconds>(duration) - duration_cast<seconds>(duration)).count()};
 }
 
 Serial::SerialImpl::SerialImpl(const std::string &port, unsigned long baudrate, bytesize_t bytesize, parity_t parity,
@@ -521,13 +485,13 @@ size_t Serial::SerialImpl::available() {
   }
 }
 
-bool Serial::SerialImpl::waitReadable(uint32_t timeout) {
+bool Serial::SerialImpl::waitReadable(std::chrono::milliseconds timeout_ms) {
   // Setup a select call to block for serial data or a timeout
   fd_set readfds;
   FD_ZERO (&readfds);
   FD_SET (fd_, &readfds);
-  timespec timeout_ts(timespec_from_ms(timeout));
-  int r = pselect(fd_ + 1, &readfds, nullptr, nullptr, &timeout_ts, nullptr);
+  timespec timeout = getTimeSpec(timeout_ms);
+  int r = pselect(fd_ + 1, &readfds, nullptr, nullptr, &timeout, nullptr);
 
   if (r < 0) {
     // Select was interrupted
@@ -561,10 +525,7 @@ size_t Serial::SerialImpl::read(uint8_t *buf, size_t size) {
   }
   size_t bytes_read = 0;
 
-  // Calculate total timeout in milliseconds t_c + (t_m * N)
-  long total_timeout_ms = timeout_.read_timeout_constant;
-  total_timeout_ms += timeout_.read_timeout_multiplier * static_cast<long> (size);
-  MillisecondTimer total_timeout(total_timeout_ms);
+  auto read_deadline = timeout_.getReadDeadline(size);
 
   // Pre-fill buffer with available bytes
   {
@@ -575,20 +536,19 @@ size_t Serial::SerialImpl::read(uint8_t *buf, size_t size) {
   }
 
   while (bytes_read < size) {
-    int64_t timeout_remaining_ms = total_timeout.remaining();
-    if (timeout_remaining_ms <= 0) {
+    auto remaining_time = Timeout::remainingMilliseconds(read_deadline);
+    if (remaining_time.count() <= 0) {
       // Timed out
       break;
     }
     // Timeout for the next select is whichever is less of the remaining
     // total read timeout and the inter-byte timeout.
-    uint32_t timeout = std::min(static_cast<uint32_t> (timeout_remaining_ms), timeout_.inter_byte_timeout);
     // Wait for the device to be readable, and then attempt to read.
-    if (waitReadable(timeout)) {
+    if (waitReadable(std::min(remaining_time, timeout_.getInterByte()))) {
       // If it's a fixed-length multi-byte read, insert a wait here so that
       // we can attempt to grab the whole thing in a single IO call. Skip
       // this wait if a non-max inter_byte_timeout is specified.
-      if (size > 1 && timeout_.inter_byte_timeout == Timeout::max()) {
+      if (size > 1 && timeout_.getInterByteMilliseconds() == std::numeric_limits<uint32_t>::max()) {
         size_t bytes_available = available();
         if (bytes_available + bytes_read < size) {
           waitByteTimes(size - (bytes_available + bytes_read));
@@ -631,28 +591,22 @@ size_t Serial::SerialImpl::write(const uint8_t *data, size_t length) {
   fd_set writefds;
   size_t bytes_written = 0;
 
-  // Calculate total timeout in milliseconds t_c + (t_m * N)
-  long total_timeout_ms = timeout_.write_timeout_constant;
-  total_timeout_ms += timeout_.write_timeout_multiplier * static_cast<long> (length);
-  MillisecondTimer total_timeout(total_timeout_ms);
+  auto write_deadline = timeout_.getWriteDeadline(length);
 
   bool first_iteration = true;
   while (bytes_written < length) {
-    int64_t timeout_remaining_ms = total_timeout.remaining();
+    auto remaining_time = Timeout::remainingMilliseconds(write_deadline);
     // Only consider the timeout if it's not the first iteration of the loop
     // otherwise a timeout of 0 won't be allowed through
-    if (!first_iteration && (timeout_remaining_ms <= 0)) {
+    if (!first_iteration && (remaining_time.count() <= 0)) {
       // Timed out
       break;
     }
     first_iteration = false;
 
-    timespec timeout(timespec_from_ms(timeout_remaining_ms));
-
     FD_ZERO (&writefds);
     FD_SET (fd_, &writefds);
-
-    // Do the select
+    timespec timeout = getTimeSpec(remaining_time);
     int r = pselect(fd_ + 1, nullptr, &writefds, nullptr, &timeout, nullptr);
 
     // Figure out what happened by looking at select's response 'r'
@@ -713,11 +667,11 @@ std::string Serial::SerialImpl::getPort() const {
   return port_;
 }
 
-void Serial::SerialImpl::setTimeout(serial::Timeout &timeout) {
+void Serial::SerialImpl::setTimeout(Serial::Timeout &timeout) {
   timeout_ = timeout;
 }
 
-serial::Timeout Serial::SerialImpl::getTimeout() const {
+Serial::Timeout Serial::SerialImpl::getTimeout() const {
   return timeout_;
 }
 
