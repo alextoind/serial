@@ -24,7 +24,7 @@
 
 using namespace serial;
 
-Serial::Serial(const std::string &port, uint32_t baudrate, serial::Timeout timeout, bytesize_t bytesize, parity_t parity,
+Serial::Serial(const std::string &port, uint32_t baudrate, Serial::Timeout timeout, bytesize_t bytesize, parity_t parity,
                stopbits_t stopbits, flowcontrol_t flowcontrol)
     : pimpl_(new SerialImpl(port, baudrate, bytesize, parity, stopbits, flowcontrol)) {
   pimpl_->setTimeout(timeout);
