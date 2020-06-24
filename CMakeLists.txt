@@ -41,7 +41,7 @@ else()
 endif()
 
 add_library(Serial SHARED
-  src/serial.cc
+  src/serial.cpp
 )
 target_include_directories(Serial PUBLIC
   $<BUILD_INTERFACE:${Serial_BINARY_DIR}/include>
@@ -50,8 +50,8 @@ target_include_directories(Serial PUBLIC
 )
 if(APPLE)
   target_sources(Serial PRIVATE
-    src/impl/impl_unix.cc
-    src/impl/list_ports/list_ports_macos.cc
+    src/impl/impl_unix.cpp
+    src/impl/list_ports/list_ports_macos.cpp
   )
   target_link_libraries(Serial PRIVATE
     "-framework CoreFoundation"
@@ -59,8 +59,8 @@ if(APPLE)
   )
 elseif(UNIX)
   target_sources(Serial PRIVATE
-    src/impl/impl_unix.cc
-    src/impl/list_ports/list_ports_linux.cc
+    src/impl/impl_unix.cpp
+    src/impl/list_ports/list_ports_linux.cpp
   )
 #TODO: seems no longer required
 #  target_link_libraries(Serial PRIVATE
@@ -69,8 +69,8 @@ elseif(UNIX)
 #  )
 else()  # already asserted WIN32 during find_package block
   target_sources(Serial PRIVATE
-    src/impl/impl_win.cc
-    src/impl/list_ports/list_ports_win.cc
+    src/impl/impl_win.cpp
+    src/impl/list_ports/list_ports_win.cpp
   )
   target_link_libraries(Serial PRIVATE
     setupapi
@@ -117,7 +117,7 @@ enable_testing()
 find_package(GTest REQUIRED CONFIG)
 
 add_executable(unix_serial_tests
-  tests/unix_serial_tests.cc
+  tests/unix_serial_tests.cpp
 )
 target_link_libraries(unix_serial_tests PRIVATE
   Serial::Serial
@@ -139,7 +139,7 @@ add_test(NAME unix_serial_tests
 )
 
 add_executable(unix_timer_tests
-  tests/unix_timer_tests.cc
+  tests/unix_timer_tests.cpp
 )
 target_link_libraries(unix_timer_tests PRIVATE
   Serial::Serial
@@ -156,7 +156,7 @@ add_test(NAME unix_timer_tests
 )
 
 add_executable(unix_list_ports_tests
-  tests/unix_list_ports_tests.cc
+  tests/unix_list_ports_tests.cpp
 )
 target_link_libraries(unix_list_ports_tests PRIVATE
   Serial::Serial
