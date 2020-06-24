@@ -25,6 +25,7 @@
 #include <chrono>
 #include <cstring>
 #include <limits>
+#include <mutex>
 #include <sstream>
 #include <string>
 #include <vector>
@@ -588,15 +589,8 @@ class Serial {
   class SerialImpl;
   SerialImpl *pimpl_;
 
-  // Scoped Lock Classes
-  class ScopedReadLock;
-  class ScopedWriteLock;
-
-  // Read common function
-  size_t read_(uint8_t *buffer, size_t size);
-
-  // Write common function
-  size_t write_(const uint8_t *data, size_t length);
+  std::mutex read_mutex_;
+  std::mutex write_mutex_;
 };
 
 class SerialException : public std::exception {

@@ -43,8 +43,6 @@ Serial::SerialImpl::SerialImpl(const std::string &port, unsigned long baudrate, 
       bytesize_(bytesize),
       stopbits_(stopbits),
       flowcontrol_(flowcontrol) {
-  pthread_mutex_init(&this->read_mutex, nullptr);
-  pthread_mutex_init(&this->write_mutex, nullptr);
   if (port_.empty() == false) {
     open();
   }
@@ -52,8 +50,6 @@ Serial::SerialImpl::SerialImpl(const std::string &port, unsigned long baudrate, 
 
 Serial::SerialImpl::~SerialImpl() {
   close();
-  pthread_mutex_destroy(&this->read_mutex);
-  pthread_mutex_destroy(&this->write_mutex);
 }
 
 void Serial::SerialImpl::open() {
@@ -916,34 +912,6 @@ bool Serial::SerialImpl::getCD() {
     throw (SerialException(ss.str().c_str()));
   } else {
     return 0 != (status & TIOCM_CD);
-  }
-}
-
-void Serial::SerialImpl::readLock() {
-  int result = pthread_mutex_lock(&this->read_mutex);
-  if (result) {
-    THROW (IOException, result);
-  }
-}
-
-void Serial::SerialImpl::readUnlock() {
-  int result = pthread_mutex_unlock(&this->read_mutex);
-  if (result) {
-    THROW (IOException, result);
-  }
-}
-
-void Serial::SerialImpl::writeLock() {
-  int result = pthread_mutex_lock(&this->write_mutex);
-  if (result) {
-    THROW (IOException, result);
-  }
-}
-
-void Serial::SerialImpl::writeUnlock() {
-  int result = pthread_mutex_unlock(&this->write_mutex);
-  if (result) {
-    THROW (IOException, result);
   }
 }
 
