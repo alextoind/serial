@@ -67,39 +67,39 @@ class Serial::SerialImpl {
 
   bool isOpen() const;
 
-  size_t available();
+  size_t available() const;
 
   bool waitReadable(std::chrono::milliseconds timeout_ms);
 
-  void waitByteTimes(size_t count);
+  void waitByteTimes(size_t count) const;
 
   size_t read(uint8_t *buf, size_t size = 1);
 
   size_t write(const uint8_t *data, size_t length);
 
-  void flush();
+  void flush() const;
 
-  void flushInput();
+  void flushInput() const;
 
-  void flushOutput();
+  void flushOutput() const;
 
-  void sendBreak(int duration);
+  void sendBreak(int duration) const;
 
-  void setBreak(bool level);
+  void setBreak(bool level) const;
 
-  void setRTS(bool level);
+  void setRTS(bool level) const;
 
-  void setDTR(bool level);
+  void setDTR(bool level) const;
 
-  bool waitForChange();
+  bool waitForChange() const;
 
-  bool getCTS();
+  bool getCTS() const;
 
-  bool getDSR();
+  bool getDSR() const;
 
-  bool getRI();
+  bool getRI() const;
 
-  bool getCD();
+  bool getCD() const;
 
   void setPort(const std::string &port);
 

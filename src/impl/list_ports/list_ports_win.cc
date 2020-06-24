@@ -39,16 +39,16 @@ static const DWORD hardware_id_max_length = 256;
 
 // Convert a wide Unicode string to an UTF8 string
 std::string utf8_encode(const std::wstring &wstr) {
-  int size_needed = WideCharToMultiByte(CP_UTF8, 0, &wstr[0], (int)wstr.size(), NULL, 0, NULL, NULL);
+  int size_needed = WideCharToMultiByte(CP_UTF8, 0, &wstr[0], (int)wstr.size(), nullptr, 0, nullptr, nullptr);
   std::string strTo(size_needed, 0);
-  WideCharToMultiByte(CP_UTF8, 0, &wstr[0], (int)wstr.size(), &strTo[0], size_needed, NULL, NULL);
+  WideCharToMultiByte(CP_UTF8, 0, &wstr[0], (int)wstr.size(), &strTo[0], size_needed, nullptr, nullptr);
   return strTo;
 }
 
 int serial::getPortsInfo(std::vector<PortInfo> &serial_ports) {
   serial_ports.clear();
 
-  HDEVINFO device_info_set = SetupDiGetClassDevs((const GUID *)&GUID_DEVCLASS_PORTS, NULL, NULL, DIGCF_PRESENT);
+  HDEVINFO device_info_set = SetupDiGetClassDevs((const GUID *)&GUID_DEVCLASS_PORTS, nullptr, nullptr, DIGCF_PRESENT);
   unsigned int device_info_set_index = 0;
   SP_DEVINFO_DATA device_info_data;
   device_info_data.cbSize = sizeof(SP_DEVINFO_DATA);
@@ -60,7 +60,7 @@ int serial::getPortsInfo(std::vector<PortInfo> &serial_ports) {
     HKEY hkey = SetupDiOpenDevRegKey(device_info_set, &device_info_data, DICS_FLAG_GLOBAL, 0, DIREG_DEV, KEY_READ);
     TCHAR port_name[port_name_max_length];
     DWORD port_name_length = port_name_max_length;
-    LONG return_code = RegQueryValueEx(hkey, _T("PortName"), NULL, NULL, (LPBYTE)port_name, &port_name_length);
+    LONG return_code = RegQueryValueEx(hkey, _T("PortName"), nullptr, nullptr, (LPBYTE)port_name, &port_name_length);
     RegCloseKey(hkey);
 
     if (return_code != EXIT_SUCCESS) {
@@ -74,7 +74,7 @@ int serial::getPortsInfo(std::vector<PortInfo> &serial_ports) {
     }
 
     // Ignore parallel ports
-    if (_tcsstr(port_name, _T("LPT")) != NULL) {
+    if (_tcsstr(port_name, _T("LPT")) != nullptr) {
       continue;
     }
 
@@ -82,7 +82,7 @@ int serial::getPortsInfo(std::vector<PortInfo> &serial_ports) {
     TCHAR friendly_name[friendly_name_max_length];
     DWORD friendly_name_actual_length = 0;
     BOOL got_friendly_name = SetupDiGetDeviceRegistryProperty(device_info_set, &device_info_data, SPDRP_FRIENDLYNAME,
-                                                              NULL, (PBYTE)friendly_name, friendly_name_max_length,
+                                                              nullptr, (PBYTE)friendly_name, friendly_name_max_length,
                                                               &friendly_name_actual_length);
 
     if (got_friendly_name == TRUE && friendly_name_actual_length > 0) {
@@ -94,7 +94,7 @@ int serial::getPortsInfo(std::vector<PortInfo> &serial_ports) {
     // Get hardware ID
     TCHAR hardware_id[hardware_id_max_length];
     DWORD hardware_id_actual_length = 0;
-    BOOL got_hardware_id = SetupDiGetDeviceRegistryProperty(device_info_set, &device_info_data, SPDRP_HARDWAREID, NULL,
+    BOOL got_hardware_id = SetupDiGetDeviceRegistryProperty(device_info_set, &device_info_data, SPDRP_HARDWAREID, nullptr,
                                                             (PBYTE)hardware_id, hardware_id_max_length,
                                                             &hardware_id_actual_length);
 

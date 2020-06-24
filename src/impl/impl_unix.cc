@@ -43,7 +43,7 @@ Serial::SerialImpl::SerialImpl(const std::string &port, unsigned long baudrate, 
       bytesize_(bytesize),
       stopbits_(stopbits),
       flowcontrol_(flowcontrol) {
-  if (port_.empty() == false) {
+  if (!port_.empty()) {
     open();
   }
 }
@@ -56,7 +56,7 @@ void Serial::SerialImpl::open() {
   if (port_.empty()) {
     throw std::invalid_argument("Empty port is invalid.");
   }
-  if (is_open_ == true) {
+  if (is_open_) {
     throw SerialException("Serial port already open.");  //TODO: actually there is no need to throw exception in this case
   }
 
@@ -175,9 +175,9 @@ void Serial::SerialImpl::reconfigurePort() {
       break;
 #endif
 #ifdef B7200
-      case 7200:
-        baud = B7200;
-        break;
+    case 7200:
+      baud = B7200;
+      break;
 #endif
 #ifdef B9600
     case 9600:
@@ -185,9 +185,9 @@ void Serial::SerialImpl::reconfigurePort() {
       break;
 #endif
 #ifdef B14400
-      case 14400:
-        baud = B14400;
-        break;
+    case 14400:
+      baud = B14400;
+      break;
 #endif
 #ifdef B19200
     case 19200:
@@ -195,9 +195,9 @@ void Serial::SerialImpl::reconfigurePort() {
       break;
 #endif
 #ifdef B28800
-      case 28800:
-        baud = B28800;
-        break;
+    case 28800:
+      baud = B28800;
+      break;
 #endif
 #ifdef B57600
     case 57600:
@@ -205,9 +205,9 @@ void Serial::SerialImpl::reconfigurePort() {
       break;
 #endif
 #ifdef B76800
-      case 76800:
-        baud = B76800;
-        break;
+    case 76800:
+      baud = B76800;
+      break;
 #endif
 #ifdef B38400
     case 38400:
@@ -220,14 +220,14 @@ void Serial::SerialImpl::reconfigurePort() {
       break;
 #endif
 #ifdef B128000
-      case 128000:
-        baud = B128000;
-        break;
+    case 128000:
+      baud = B128000;
+      break;
 #endif
 #ifdef B153600
-      case 153600:
-        baud = B153600;
-        break;
+    case 153600:
+      baud = B153600;
+      break;
 #endif
 #ifdef B230400
     case 230400:
@@ -235,9 +235,9 @@ void Serial::SerialImpl::reconfigurePort() {
       break;
 #endif
 #ifdef B256000
-      case 256000:
-        baud = B256000;
-        break;
+    case 256000:
+      baud = B256000;
+      break;
 #endif
 #ifdef B460800
     case 460800:
@@ -332,7 +332,7 @@ void Serial::SerialImpl::reconfigurePort() {
       throw std::invalid_argument ("OS does not currently support custom bauds");
 #endif
   }
-  if (custom_baud == false) {
+  if (!custom_baud) {
 #ifdef _BSD_SOURCE
     ::cfsetspeed(&options, baud);
 #else
@@ -357,10 +357,8 @@ void Serial::SerialImpl::reconfigurePort() {
   // setup stopbits
   if (stopbits_ == stopbits_one) {
     options.c_cflag &= (tcflag_t)~(CSTOPB);
-  } else if (stopbits_ == stopbits_one_point_five) {
+  } else if (stopbits_ == stopbits_one_point_five || stopbits_ == stopbits_two) {
     // ONE POINT FIVE same as TWO.. there is no POSIX support for 1.5
-    options.c_cflag |= (CSTOPB);
-  } else if (stopbits_ == stopbits_two) {
     options.c_cflag |= (CSTOPB);
   } else {
     throw std::invalid_argument("invalid stop bit");
@@ -383,10 +381,10 @@ void Serial::SerialImpl::reconfigurePort() {
     options.c_cflag &= (tcflag_t)~(PARODD);
   }
 #else
-    // CMSPAR is not defined on OSX. So do not support mark or space parity.
-    else if (parity_ == parity_mark || parity_ == parity_space) {
-      throw std::invalid_argument ("OS does not support mark or space parity");
-    }
+  // CMSPAR is not defined on OSX. So do not support mark or space parity.
+  else if (parity_ == parity_mark || parity_ == parity_space) {
+    throw std::invalid_argument ("OS does not support mark or space parity");
+  }
 #endif  // ifdef CMSPAR
   else {
     throw std::invalid_argument("invalid parity");
@@ -455,7 +453,7 @@ void Serial::SerialImpl::reconfigurePort() {
 }
 
 void Serial::SerialImpl::close() {
-  if (is_open_ == true) {
+  if (is_open_) {
     if (fd_ != -1) {
       int ret;
       ret = ::close(fd_);
@@ -473,7 +471,7 @@ bool Serial::SerialImpl::isOpen() const {
   return is_open_;
 }
 
-size_t Serial::SerialImpl::available() {
+size_t Serial::SerialImpl::available() const {
   if (!is_open_) {
     return 0;
   }
@@ -513,7 +511,7 @@ bool Serial::SerialImpl::waitReadable(std::chrono::milliseconds timeout_ms) {
   return true;
 }
 
-void Serial::SerialImpl::waitByteTimes(size_t count) {
+void Serial::SerialImpl::waitByteTimes(size_t count) const {
   timespec wait_time = {0, static_cast<long>(byte_time_ns_ * count)};
   pselect(0, nullptr, nullptr, nullptr, &wait_time, nullptr);
 }
@@ -585,7 +583,7 @@ size_t Serial::SerialImpl::read(uint8_t *buf, size_t size) {
 }
 
 size_t Serial::SerialImpl::write(const uint8_t *data, size_t length) {
-  if (is_open_ == false) {
+  if (!is_open_) {
     throw PortNotOpenedException("Serial::write");
   }
   fd_set writefds;
@@ -730,36 +728,36 @@ serial::flowcontrol_t Serial::SerialImpl::getFlowcontrol() const {
   return flowcontrol_;
 }
 
-void Serial::SerialImpl::flush() {
-  if (is_open_ == false) {
+void Serial::SerialImpl::flush() const {
+  if (!is_open_) {
     throw PortNotOpenedException("Serial::flush");
   }
   tcdrain(fd_);
 }
 
-void Serial::SerialImpl::flushInput() {
-  if (is_open_ == false) {
+void Serial::SerialImpl::flushInput() const {
+  if (!is_open_) {
     throw PortNotOpenedException("Serial::flushInput");
   }
   tcflush(fd_, TCIFLUSH);
 }
 
-void Serial::SerialImpl::flushOutput() {
-  if (is_open_ == false) {
+void Serial::SerialImpl::flushOutput() const {
+  if (!is_open_) {
     throw PortNotOpenedException("Serial::flushOutput");
   }
   tcflush(fd_, TCOFLUSH);
 }
 
-void Serial::SerialImpl::sendBreak(int duration) {
-  if (is_open_ == false) {
+void Serial::SerialImpl::sendBreak(int duration) const {
+  if (!is_open_) {
     throw PortNotOpenedException("Serial::sendBreak");
   }
   tcsendbreak(fd_, static_cast<int> (duration / 4));
 }
 
-void Serial::SerialImpl::setBreak(bool level) {
-  if (is_open_ == false) {
+void Serial::SerialImpl::setBreak(bool level) const {
+  if (!is_open_) {
     throw PortNotOpenedException("Serial::setBreak");
   }
 
@@ -778,8 +776,8 @@ void Serial::SerialImpl::setBreak(bool level) {
   }
 }
 
-void Serial::SerialImpl::setRTS(bool level) {
-  if (is_open_ == false) {
+void Serial::SerialImpl::setRTS(bool level) const {
+  if (!is_open_) {
     throw PortNotOpenedException("Serial::setRTS");
   }
 
@@ -800,8 +798,8 @@ void Serial::SerialImpl::setRTS(bool level) {
   }
 }
 
-void Serial::SerialImpl::setDTR(bool level) {
-  if (is_open_ == false) {
+void Serial::SerialImpl::setDTR(bool level) const {
+  if (!is_open_) {
     throw PortNotOpenedException("Serial::setDTR");
   }
 
@@ -822,7 +820,7 @@ void Serial::SerialImpl::setDTR(bool level) {
   }
 }
 
-bool Serial::SerialImpl::waitForChange() {
+bool Serial::SerialImpl::waitForChange() const {
 #ifndef TIOCMIWAIT
   while (is_open_ == true) {
     int status;
@@ -851,13 +849,12 @@ bool Serial::SerialImpl::waitForChange() {
 #endif
 }
 
-bool Serial::SerialImpl::getCTS() {
-  if (is_open_ == false) {
+bool Serial::SerialImpl::getCTS() const {
+  if (!is_open_) {
     throw PortNotOpenedException("Serial::getCTS");
   }
 
   int status;
-
   if (-1 == ioctl(fd_, TIOCMGET, &status)) {
     std::stringstream ss;
     ss << "getCTS failed on a call to ioctl(TIOCMGET): " << errno << " " << strerror(errno);
@@ -867,13 +864,12 @@ bool Serial::SerialImpl::getCTS() {
   }
 }
 
-bool Serial::SerialImpl::getDSR() {
-  if (is_open_ == false) {
+bool Serial::SerialImpl::getDSR() const {
+  if (!is_open_) {
     throw PortNotOpenedException("Serial::getDSR");
   }
 
   int status;
-
   if (-1 == ioctl(fd_, TIOCMGET, &status)) {
     std::stringstream ss;
     ss << "getDSR failed on a call to ioctl(TIOCMGET): " << errno << " " << strerror(errno);
@@ -883,13 +879,12 @@ bool Serial::SerialImpl::getDSR() {
   }
 }
 
-bool Serial::SerialImpl::getRI() {
-  if (is_open_ == false) {
+bool Serial::SerialImpl::getRI() const {
+  if (!is_open_) {
     throw PortNotOpenedException("Serial::getRI");
   }
 
   int status;
-
   if (-1 == ioctl(fd_, TIOCMGET, &status)) {
     std::stringstream ss;
     ss << "getRI failed on a call to ioctl(TIOCMGET): " << errno << " " << strerror(errno);
@@ -899,13 +894,12 @@ bool Serial::SerialImpl::getRI() {
   }
 }
 
-bool Serial::SerialImpl::getCD() {
-  if (is_open_ == false) {
+bool Serial::SerialImpl::getCD() const {
+  if (!is_open_) {
     throw PortNotOpenedException("Serial::getCD");
   }
 
   int status;
-
   if (-1 == ioctl(fd_, TIOCMGET, &status)) {
     std::stringstream ss;
     ss << "getCD failed on a call to ioctl(TIOCMGET): " << errno << " " << strerror(errno);
