@@ -49,7 +49,7 @@ Serial::SerialImpl::SerialImpl(const std::string &port, unsigned long baudrate, 
 }
 
 Serial::SerialImpl::~SerialImpl() {
-  this->close();
+  close();
 }
 
 void Serial::SerialImpl::open() {
@@ -69,8 +69,8 @@ void Serial::SerialImpl::open() {
     DWORD create_file_err = GetLastError();
     std::stringstream ss;
     if (create_file_err == ERROR_FILE_NOT_FOUND) {
-      // Use this->getPort to convert to a std::string
-      ss << "Specified port, " << this->getPort() << ", does not exist.";
+      // Use getPort to convert to a std::string
+      ss << "Specified port, " << getPort() << ", does not exist.";
       THROW (IOException, ss.str().c_str());
     } else{
       ss << "Unknown error opening the serial port: " << create_file_err;

@@ -61,7 +61,7 @@ void Serial::waitByteTimes(size_t count) {
 
 size_t Serial::read(uint8_t *buffer, size_t size) {
   std::lock_guard<std::mutex> read_lock(read_mutex_);
-  return this->pimpl_->read(buffer, size);
+  return pimpl_->read(buffer, size);
 }
 
 size_t Serial::read(std::vector<uint8_t> &buffer, size_t size) {
@@ -70,7 +70,7 @@ size_t Serial::read(std::vector<uint8_t> &buffer, size_t size) {
   size_t bytes_read = 0;
 
   try {
-    bytes_read = this->pimpl_->read(buffer_, size);
+    bytes_read = pimpl_->read(buffer_, size);
   } catch (const std::exception &e) {
     delete[] buffer_;
     throw;
@@ -86,7 +86,7 @@ size_t Serial::read(std::string &buffer, size_t size) {
   auto buffer_ = new uint8_t[size];
   size_t bytes_read = 0;
   try {
-    bytes_read = this->pimpl_->read(buffer_, size);
+    bytes_read = pimpl_->read(buffer_, size);
   } catch (const std::exception &e) {
     delete[] buffer_;
     throw;
@@ -98,7 +98,7 @@ size_t Serial::read(std::string &buffer, size_t size) {
 
 std::string Serial::read(size_t size) {
   std::string buffer;
-  this->read(buffer, size);
+  read(buffer, size);
   return buffer;
 }
 
@@ -127,7 +127,7 @@ size_t Serial::readline(std::string &buffer, size_t size, std::string eol) {
 
 std::string Serial::readline(size_t size, std::string eol) {
   std::string buffer;
-  this->readline(buffer, size, eol);
+  readline(buffer, size, eol);
   return buffer;
 }
 
@@ -145,7 +145,7 @@ std::vector<std::string> Serial::readlines(size_t size, std::string eol) {
       if (start_of_line != read_so_far) {
         lines.push_back(std::string(reinterpret_cast<const char *>(buffer_ + start_of_line), read_so_far - start_of_line));
       }
-      break; // Timeout occured on reading 1 byte
+      break; // Timeout occurred on reading 1 byte
     }
     if (std::string(reinterpret_cast<const char *>(buffer_ + read_so_far - eol_len), eol_len) == eol) {
       // EOL found
