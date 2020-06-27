@@ -840,9 +840,9 @@ bool Serial::SerialImpl::waitForChange() const {
 #else
   int command = (TIOCM_CD | TIOCM_DSR | TIOCM_RI | TIOCM_CTS);
 
-  if (-1 == ioctl(fd_, TIOCMIWAIT, &command)) {
+  if (-1 == ioctl(fd_, TIOCMIWAIT, command)) {
     std::stringstream ss;
-    ss << "waitForDSR failed on a call to ioctl(TIOCMIWAIT): " << errno << " " << strerror(errno);
+    ss << "waitForChange failed on a call to ioctl(TIOCMIWAIT): " << errno << " " << strerror(errno);
     throw (SerialException(ss.str().c_str()));
   }
   return true;
