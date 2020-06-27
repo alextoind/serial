@@ -102,26 +102,23 @@ std::string Serial::read(size_t size) {
   return buffer;
 }
 
-size_t Serial::readline(std::string &buffer, size_t size, std::string eol) {
+size_t Serial::readline(std::string &line, size_t size, std::string eol) {
   std::lock_guard<std::mutex> read_lock(read_mutex_);
+  auto buffer = new uint8_t[size];
   size_t eol_len = eol.length();
-  auto buffer_ = new uint8_t[size];
   size_t read_so_far = 0;
-  while (true) {
-    size_t bytes_read = pimpl_->read(buffer_ + read_so_far, 1);
+  while (read_so_far < size) {
+    size_t bytes_read = pimpl_->read(buffer + read_so_far, 1);
     read_so_far += bytes_read;
     if (bytes_read == 0) {
       break; // Timeout occurred on reading 1 byte
     }
-    if (std::string(reinterpret_cast<const char *>(buffer_ + read_so_far - eol_len), eol_len) == eol) {
+    if (read_so_far >= eol_len && std::string(reinterpret_cast<const char *>(buffer + read_so_far - eol_len), eol_len) == eol) {
       break; // EOL found
     }
-    if (read_so_far == size) {
-      break; // Reached the maximum read length
-    }
   }
-  buffer.append(reinterpret_cast<const char *> (buffer_), read_so_far);
-  delete[] buffer_;
+  line.append(reinterpret_cast<const char *>(buffer), read_so_far);
+  delete[] buffer;
   return read_so_far;
 }
 
@@ -131,35 +128,36 @@ std::string Serial::readline(size_t size, std::string eol) {
   return buffer;
 }
 
+//TODO: this method could use readline implementation and few hacks, but it should avoid to lock twice on mutex
 std::vector<std::string> Serial::readlines(size_t size, std::string eol) {
   std::lock_guard<std::mutex> read_lock(read_mutex_);
   std::vector<std::string> lines;
+  auto buffer = new uint8_t[size];
   size_t eol_len = eol.length();
-  auto buffer_ = new uint8_t[size];
   size_t read_so_far = 0;
   size_t start_of_line = 0;
   while (read_so_far < size) {
-    size_t bytes_read = pimpl_->read(buffer_ + read_so_far, 1);
+    size_t bytes_read = pimpl_->read(buffer + read_so_far, 1);
     read_so_far += bytes_read;
     if (bytes_read == 0) {
       if (start_of_line != read_so_far) {
-        lines.push_back(std::string(reinterpret_cast<const char *>(buffer_ + start_of_line), read_so_far - start_of_line));
+        lines.push_back(std::string(reinterpret_cast<const char *>(buffer + start_of_line), read_so_far - start_of_line));
       }
       break; // Timeout occurred on reading 1 byte
     }
-    if (std::string(reinterpret_cast<const char *>(buffer_ + read_so_far - eol_len), eol_len) == eol) {
+    if (read_so_far >= eol_len && std::string(reinterpret_cast<const char *>(buffer + read_so_far - eol_len), eol_len) == eol) {
       // EOL found
-      lines.push_back(std::string(reinterpret_cast<const char *>(buffer_ + start_of_line), read_so_far - start_of_line));
+      lines.push_back(std::string(reinterpret_cast<const char *>(buffer + start_of_line), read_so_far - start_of_line));
       start_of_line = read_so_far;
     }
     if (read_so_far == size) {
       if (start_of_line != read_so_far) {
-        lines.push_back(std::string(reinterpret_cast<const char *>(buffer_ + start_of_line), read_so_far - start_of_line));
+        lines.push_back(std::string(reinterpret_cast<const char *>(buffer + start_of_line), read_so_far - start_of_line));
       }
       break; // Reached the maximum read length
     }
   }
-  delete[] buffer_;
+  delete[] buffer;
   return lines;
 }
 

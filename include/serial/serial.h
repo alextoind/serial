@@ -278,7 +278,7 @@ class Serial {
    *
    * Reads from the serial port until a single line has been read.
    *
-   * \param buffer A std::string reference used to store the data.
+   * \param line A std::string reference used to store the data.
    * \param size A maximum length of a line, defaults to 65536 (2^16)
    * \param eol A string to match against for the EOL.
    *
@@ -287,7 +287,7 @@ class Serial {
    * \throw serial::PortNotOpenedException
    * \throw serial::SerialException
    */
-  size_t readline(std::string &buffer, size_t size = 65536, std::string eol = "\n");
+  size_t readline(std::string &line, size_t size = 65536, std::string eol = "\n");
 
   /*! Reads in a line or until a given delimiter has been processed.
    *
