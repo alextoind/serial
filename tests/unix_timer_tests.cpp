@@ -60,23 +60,23 @@ class TimeoutTests : public ::testing::Test {
 };
 
 TEST_F(TimeoutTests, SimpleTimeoutRead) {
-  EXPECT_NEAR(cycleRead(simple_timeout, 8, 0).count(), 0, 2);
-  EXPECT_NEAR(cycleRead(simple_timeout, 8, 10).count(), 0, 2);
+  EXPECT_NEAR(cycleRead(simple_timeout, 8, 0).count(), 0, 5);
+  EXPECT_NEAR(cycleRead(simple_timeout, 8, 10).count(), 0, 5);
 }
 
 TEST_F(TimeoutTests, SimpleTimeoutWrite) {
-  EXPECT_NEAR(cycleWrite(simple_timeout, 8, 0).count(), 0, 2);
-  EXPECT_NEAR(cycleWrite(simple_timeout, 8, 10).count(), 0, 2);
+  EXPECT_NEAR(cycleWrite(simple_timeout, 8, 0).count(), 0, 5);
+  EXPECT_NEAR(cycleWrite(simple_timeout, 8, 10).count(), 0, 5);
 }
 
 TEST_F(TimeoutTests, CompleteTimeoutRead) {
-  EXPECT_NEAR(cycleRead(complete_timeout, 20, 0).count(), 0, 2);
-  EXPECT_NEAR(cycleRead(complete_timeout, 4, 2).count(), 0, 2);
+  EXPECT_NEAR(cycleRead(complete_timeout, 20, 0).count(), 0, 5);
+  EXPECT_NEAR(cycleRead(complete_timeout, 4, 2).count(), 0, 5);
 }
 
 TEST_F(TimeoutTests, CompleteTimeoutWrite) {
-  EXPECT_NEAR(cycleWrite(complete_timeout, 2, 0).count(), 0, 2);
-  EXPECT_NEAR(cycleWrite(complete_timeout, 2, 1000).count(), 0, 2);
+  EXPECT_NEAR(cycleWrite(complete_timeout, 2, 0).count(), 0, 5);
+  EXPECT_NEAR(cycleWrite(complete_timeout, 2, 1000).count(), 0, 5);
 }
 #endif
 
