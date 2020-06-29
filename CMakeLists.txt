@@ -32,8 +32,7 @@ if(APPLE)
     message(FATAL_ERROR "IOKit framework not found.")
   endif()
 elseif(UNIX)
-#  find_package(rt REQUIRED)  #FIXME: not as package or module
-#  find_package(Threads REQUIRED)  #TODO: seems no longer required
+  # noting to fetch
 elseif(WIN32)
   # noting to fetch
 else()
@@ -62,11 +61,6 @@ elseif(UNIX)
     src/impl/impl_unix.cpp
     src/impl/list_ports/list_ports_linux.cpp
   )
-#TODO: seems no longer required
-#  target_link_libraries(Serial PRIVATE
-#    rt
-#    Threads::Threads
-#  )
 else()  # already asserted WIN32 during find_package block
   target_sources(Serial PRIVATE
     src/impl/impl_win.cpp
