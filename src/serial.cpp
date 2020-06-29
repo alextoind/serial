@@ -51,8 +51,7 @@ size_t Serial::available() {
 }
 
 bool Serial::waitReadable() {
-  Serial::Timeout timeout(pimpl_->getTimeout());
-  return pimpl_->waitReadable(timeout.getReadConstant());
+  return pimpl_->waitReadable(pimpl_->getTimeout().getReadConstant());
 }
 
 void Serial::waitByteTimes(size_t count) {
@@ -66,29 +65,17 @@ size_t Serial::read(uint8_t *buffer, size_t size) {
 
 size_t Serial::read(std::vector<uint8_t> &buffer, size_t size) {
   std::lock_guard<std::mutex> read_lock(read_mutex_);
-  std::unique_ptr<uint8_t[]> buffer_(new uint8_t[size]);
-  size_t bytes_read = 0;
-
-  try {
-    bytes_read = pimpl_->read(buffer_.get(), size);
-  } catch (const std::exception &e) {
-    throw;
-  }
-
-  buffer.insert(buffer.end(), buffer_.get(), buffer_.get() + bytes_read);
+  std::unique_ptr<uint8_t[]> buf(new uint8_t[size]);
+  size_t bytes_read = pimpl_->read(buf.get(), size);
+  buffer.insert(buffer.end(), buf.get(), buf.get() + bytes_read);
   return bytes_read;
 }
 
 size_t Serial::read(std::string &buffer, size_t size) {
   std::lock_guard<std::mutex> read_lock(read_mutex_);
-  std::unique_ptr<uint8_t[]> buffer_(new uint8_t[size]);
-  size_t bytes_read = 0;
-  try {
-    bytes_read = pimpl_->read(buffer_.get(), size);
-  } catch (const std::exception &e) {
-    throw;
-  }
-  buffer.append(reinterpret_cast<const char *>(buffer_.get()), bytes_read);
+  std::unique_ptr<uint8_t[]> buf(new uint8_t[size]);
+  size_t bytes_read = pimpl_->read(buf.get(), size);
+  buffer.append(reinterpret_cast<const char *>(buf.get()), bytes_read);
   return bytes_read;
 }
 
