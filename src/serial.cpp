@@ -31,7 +31,7 @@ Serial::Serial(const std::string &port, uint32_t baudrate, Serial::Timeout timeo
 }
 
 Serial::~Serial() {
-  delete pimpl_;
+  // pimpl_ is automatically destroyed and close() is called inside pimpl_ destructor
 }
 
 void Serial::open() {
@@ -66,33 +66,29 @@ size_t Serial::read(uint8_t *buffer, size_t size) {
 
 size_t Serial::read(std::vector<uint8_t> &buffer, size_t size) {
   std::lock_guard<std::mutex> read_lock(read_mutex_);
-  auto buffer_ = new uint8_t[size];
+  std::unique_ptr<uint8_t[]> buffer_(new uint8_t[size]);
   size_t bytes_read = 0;
 
   try {
-    bytes_read = pimpl_->read(buffer_, size);
+    bytes_read = pimpl_->read(buffer_.get(), size);
   } catch (const std::exception &e) {
-    delete[] buffer_;
     throw;
   }
 
-  buffer.insert(buffer.end(), buffer_, buffer_ + bytes_read);
-  delete[] buffer_;
+  buffer.insert(buffer.end(), buffer_.get(), buffer_.get() + bytes_read);
   return bytes_read;
 }
 
 size_t Serial::read(std::string &buffer, size_t size) {
   std::lock_guard<std::mutex> read_lock(read_mutex_);
-  auto buffer_ = new uint8_t[size];
+  std::unique_ptr<uint8_t[]> buffer_(new uint8_t[size]);
   size_t bytes_read = 0;
   try {
-    bytes_read = pimpl_->read(buffer_, size);
+    bytes_read = pimpl_->read(buffer_.get(), size);
   } catch (const std::exception &e) {
-    delete[] buffer_;
     throw;
   }
-  buffer.append(reinterpret_cast<const char *>(buffer_), bytes_read);
-  delete[] buffer_;
+  buffer.append(reinterpret_cast<const char *>(buffer_.get()), bytes_read);
   return bytes_read;
 }
 
@@ -104,21 +100,20 @@ std::string Serial::read(size_t size) {
 
 size_t Serial::readline(std::string &line, size_t size, std::string eol) {
   std::lock_guard<std::mutex> read_lock(read_mutex_);
-  auto buffer = new uint8_t[size];
+  std::unique_ptr<uint8_t[]> buffer(new uint8_t[size]);
   size_t eol_len = eol.length();
   size_t read_so_far = 0;
   while (read_so_far < size) {
-    size_t bytes_read = pimpl_->read(buffer + read_so_far, 1);
+    size_t bytes_read = pimpl_->read(buffer.get() + read_so_far, 1);
     read_so_far += bytes_read;
     if (bytes_read == 0) {
       break; // Timeout occurred on reading 1 byte
     }
-    if (read_so_far >= eol_len && std::string(reinterpret_cast<const char *>(buffer + read_so_far - eol_len), eol_len) == eol) {
+    if (read_so_far >= eol_len && std::string(reinterpret_cast<const char *>(buffer.get() + read_so_far - eol_len), eol_len) == eol) {
       break; // EOL found
     }
   }
-  line.append(reinterpret_cast<const char *>(buffer), read_so_far);
-  delete[] buffer;
+  line.append(reinterpret_cast<const char *>(buffer.get()), read_so_far);
   return read_so_far;
 }
 
@@ -132,32 +127,31 @@ std::string Serial::readline(size_t size, std::string eol) {
 std::vector<std::string> Serial::readlines(size_t size, std::string eol) {
   std::lock_guard<std::mutex> read_lock(read_mutex_);
   std::vector<std::string> lines;
-  auto buffer = new uint8_t[size];
+  std::unique_ptr<uint8_t[]> buffer(new uint8_t[size]);
   size_t eol_len = eol.length();
   size_t read_so_far = 0;
   size_t start_of_line = 0;
   while (read_so_far < size) {
-    size_t bytes_read = pimpl_->read(buffer + read_so_far, 1);
+    size_t bytes_read = pimpl_->read(buffer.get() + read_so_far, 1);
     read_so_far += bytes_read;
     if (bytes_read == 0) {
       if (start_of_line != read_so_far) {
-        lines.push_back(std::string(reinterpret_cast<const char *>(buffer + start_of_line), read_so_far - start_of_line));
+        lines.push_back(std::string(reinterpret_cast<const char *>(buffer.get() + start_of_line), read_so_far - start_of_line));
       }
       break; // Timeout occurred on reading 1 byte
     }
-    if (read_so_far >= eol_len && std::string(reinterpret_cast<const char *>(buffer + read_so_far - eol_len), eol_len) == eol) {
+    if (read_so_far >= eol_len && std::string(reinterpret_cast<const char *>(buffer.get() + read_so_far - eol_len), eol_len) == eol) {
       // EOL found
-      lines.push_back(std::string(reinterpret_cast<const char *>(buffer + start_of_line), read_so_far - start_of_line));
+      lines.push_back(std::string(reinterpret_cast<const char *>(buffer.get() + start_of_line), read_so_far - start_of_line));
       start_of_line = read_so_far;
     }
     if (read_so_far == size) {
       if (start_of_line != read_so_far) {
-        lines.push_back(std::string(reinterpret_cast<const char *>(buffer + start_of_line), read_so_far - start_of_line));
+        lines.push_back(std::string(reinterpret_cast<const char *>(buffer.get() + start_of_line), read_so_far - start_of_line));
       }
       break; // Reached the maximum read length
     }
   }
-  delete[] buffer;
   return lines;
 }
 

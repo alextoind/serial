@@ -25,6 +25,7 @@
 #include <chrono>
 #include <cstring>
 #include <limits>
+#include <memory>
 #include <mutex>
 #include <sstream>
 #include <string>
@@ -587,7 +588,7 @@ class Serial {
 
   // Pimpl idiom, d_pointer
   class SerialImpl;
-  SerialImpl *pimpl_;
+  std::unique_ptr<SerialImpl> pimpl_;
 
   std::mutex read_mutex_;
   std::mutex write_mutex_;
