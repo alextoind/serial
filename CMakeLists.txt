@@ -116,6 +116,7 @@ add_executable(unix_serial_tests
 target_link_libraries(unix_serial_tests PRIVATE
   Serial::Serial
   GTest::gtest
+  GTest::gmock
   GTest::gtest_main
 )
 if(UNIX)

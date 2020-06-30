@@ -74,7 +74,7 @@ TEST(ListSerialPorts, PortInfo) {
 }
 #endif
 
-TEST(timer_tests, dummy) {
+TEST(DummyTests, Dummy) {
   ASSERT_TRUE(true);
 }
 
