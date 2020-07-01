@@ -42,7 +42,7 @@ class SerialTests : public ::testing::Test {
     ASSERT_TRUE(master_fd_ > 0);
     ASSERT_TRUE(slave_fd_ > 0);
     EXPECT_THAT(std::string(pty_name), ::testing::MatchesRegex("^/dev/.*"));
-    EXPECT_NO_THROW(serial_port_ = std::unique_ptr<Serial>(new Serial(std::string(pty_name), 9600, Serial::Timeout(250))));
+    EXPECT_NO_THROW(serial_port_ = std::unique_ptr<Serial>(new Serial(std::string(pty_name), 9600, Serial::Timeout(100))));
   }
 
   void TearDown() override {
@@ -112,6 +112,49 @@ TEST_F(SerialTests, Reads) {
   EXPECT_EQ(vec[5], 0xFF);
 }
 
+TEST_F(SerialTests, ReadLines) {
+  ::write(master_fd_, "abcd1234\nefgh5678\nil\r9", 22);
+  EXPECT_EQ(serial_port_->readline(), std::string("abcd1234\n"));
+  EXPECT_EQ(serial_port_->readline(), std::string("efgh5678\n"));
+  EXPECT_EQ(serial_port_->readline(), std::string("il\r9"));  // timeout
+
+  std::string line;
+  ::write(master_fd_, "abcd1234\nefgh5678\nil\r9", 22);
+  EXPECT_EQ(serial_port_->readline(line), 9);
+  EXPECT_EQ(line, std::string("abcd1234\n"));
+  EXPECT_EQ(serial_port_->readline(line, 0), 0);
+  EXPECT_EQ(line, std::string("abcd1234\n"));
+  EXPECT_EQ(serial_port_->readline(line, 4), 4);
+  EXPECT_EQ(line, std::string("abcd1234\nefgh"));
+  EXPECT_EQ(serial_port_->readline(line, 10, "7"), 3);
+  EXPECT_EQ(line, std::string("abcd1234\nefgh567"));
+  EXPECT_EQ(serial_port_->readline(line, 10, ""), 1);
+  EXPECT_EQ(line, std::string("abcd1234\nefgh5678"));
+  EXPECT_EQ(serial_port_->readline(line, 10, "il\r"), 4);
+  EXPECT_EQ(line, std::string("abcd1234\nefgh5678\nil\r"));
+  EXPECT_EQ(serial_port_->readline(line, 10, "il\r"), 1);  // timeout
+  EXPECT_EQ(line, std::string("abcd1234\nefgh5678\nil\r9"));
+
+  std::vector<std::string> lines;
+  ::write(master_fd_, "abcd1234\nefgh5678\nil\r9", 22);
+  EXPECT_NO_THROW(lines = serial_port_->readlines());  // timeout
+  EXPECT_EQ(lines.size(), 3);
+  EXPECT_EQ(lines.at(0), std::string("abcd1234\n"));
+  EXPECT_EQ(lines.at(1), std::string("efgh5678\n"));
+  EXPECT_EQ(lines.at(2), std::string("il\r9"));
+
+  ::write(master_fd_, "abcd1234\nefgh5678\nil\r9", 22);
+  EXPECT_NO_THROW(lines = serial_port_->readlines(0));
+  EXPECT_EQ(lines.size(), 0);
+  EXPECT_NO_THROW(lines = serial_port_->readlines(8, ""));
+  EXPECT_EQ(lines.size(), 8);
+  EXPECT_EQ(lines.at(0), std::string("a"));
+  EXPECT_EQ(lines.at(7), std::string("4"));
+  EXPECT_NO_THROW(lines = serial_port_->readlines(22, "xyz"));  // timeout
+  EXPECT_EQ(lines.size(), 1);
+  EXPECT_EQ(lines.at(0), std::string("\nefgh5678\nil\r9"));
+}
+
 TEST_F(SerialTests, Writes) {
   char buf[5] = "";
   EXPECT_EQ(serial_port_->write(std::string("abcd")), 4);
@@ -147,7 +190,6 @@ TEST_F(SerialTests, Flush) {
   ::write(master_fd_, "abcd1234", 8);
   EXPECT_NO_THROW(serial_port_->flush());
   EXPECT_EQ(serial_port_->read(1), std::string(""));  // timeout
-
   ::write(master_fd_, "abcd1234", 8);
   EXPECT_NO_THROW(serial_port_->flushInput());
   EXPECT_EQ(serial_port_->read(1), std::string(""));  // timeout
