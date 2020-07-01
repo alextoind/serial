@@ -732,7 +732,7 @@ void Serial::SerialImpl::flush() const {
   if (!is_open_) {
     throw PortNotOpenedException("Serial::flush");
   }
-  tcdrain(fd_);
+  tcflush(fd_, TCIOFLUSH);
 }
 
 void Serial::SerialImpl::flushInput() const {

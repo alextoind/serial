@@ -465,7 +465,7 @@ void Serial::SerialImpl::flush() const {
   if (!is_open_) {
     throw PortNotOpenedException("Serial::flush");
   }
-  FlushFileBuffers(fd_);
+  PurgeComm(fd_, PURGE_RXCLEAR | PURGE_TXCLEAR);
 }
 
 void Serial::SerialImpl::flushInput() const {
