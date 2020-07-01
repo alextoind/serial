@@ -56,10 +56,11 @@ class SerialTests : public ::testing::Test {
 };
 
 TEST_F(SerialTests, OpenAndClose) {
+  // cannot use EXPECT_* because on failure the following would be influenced
   ASSERT_TRUE(serial_port_->isOpen());
   ASSERT_THROW(serial_port_->open(), SerialException);  // already open
   ASSERT_TRUE(serial_port_->isOpen());
-  serial_port_->close();
+  ASSERT_NO_THROW(serial_port_->close());
   ASSERT_FALSE(serial_port_->isOpen());
   ASSERT_NO_THROW(serial_port_->open());
   ASSERT_TRUE(serial_port_->isOpen());
@@ -70,63 +71,99 @@ TEST_F(SerialTests, Reads) {
   EXPECT_EQ(serial_port_->read(4), std::string("abcd"));
   EXPECT_EQ(serial_port_->read(3), std::string("123"));
   EXPECT_EQ(serial_port_->read(2), std::string("4"));  // timeout
-  //TODO: add the other read methods and also partial reads
+
+  std::string str;
+  ::write(master_fd_, "efgh5678", 8);
+  EXPECT_EQ(serial_port_->read(str, 4), 4);
+  EXPECT_EQ(str, std::string("efgh"));
+  EXPECT_EQ(serial_port_->read(str, 0), 0);
+  EXPECT_EQ(str, std::string("efgh"));
+  EXPECT_EQ(serial_port_->read(str, 3), 3);
+  EXPECT_EQ(str, std::string("efgh567"));
+  EXPECT_EQ(serial_port_->read(str, 2), 1);  // timeout
+  EXPECT_EQ(str, std::string("efgh5678"));
+
+  uint8_t cmd_vec[6] {0x12, 0x34, 0xF0, 0x0F, 0x00, 0xFF};
+  std::vector<uint8_t> std_vec;
+  ::write(master_fd_, cmd_vec, 6);
+  EXPECT_EQ(serial_port_->read(std_vec, 3), 3);
+  EXPECT_EQ(std_vec.size(), 3);
+  EXPECT_EQ(serial_port_->read(std_vec, 0), 0);
+  EXPECT_EQ(std_vec.size(), 3);
+  EXPECT_EQ(serial_port_->read(std_vec, 2), 2);
+  EXPECT_EQ(std_vec.size(), 5);
+  EXPECT_EQ(serial_port_->read(std_vec, 2), 1);  // timeout
+  EXPECT_EQ(std_vec.size(), 6);
+  EXPECT_EQ(std_vec.front(), 0x12);
+  EXPECT_EQ(std_vec.back(), 0xFF);
+
+  uint8_t vec[6] {0x11, 0x11, 0x11, 0x11, 0x11, 0x11};
+  ::write(master_fd_, cmd_vec, 6);
+  EXPECT_EQ(serial_port_->read(vec, 3), 3);
+  EXPECT_EQ(vec[0], 0x12);
+  EXPECT_EQ(vec[1], 0x34);
+  EXPECT_EQ(vec[2], 0xF0);
+  EXPECT_EQ(serial_port_->read(vec, 0), 0);
+  EXPECT_EQ(vec[3], 0x11);
+  EXPECT_EQ(serial_port_->read(vec+3, 2), 2);
+  EXPECT_EQ(vec[3], 0x0F);
+  EXPECT_EQ(vec[4], 0x00);
+  EXPECT_EQ(serial_port_->read(vec+5, 2), 1);  // timeout
+  EXPECT_EQ(vec[5], 0xFF);
 }
 
 TEST_F(SerialTests, Writes) {
-  serial_port_->write("abc\n");
   char buf[5] = "";
+  EXPECT_EQ(serial_port_->write(std::string("abcd")), 4);
   ::read(master_fd_, buf, 4);
-  EXPECT_EQ(std::string(buf, 4), std::string("abc\n"));
-  //TODO: add the other write methods
+  EXPECT_EQ(std::string(buf, 4), std::string("abcd"));
+
+  EXPECT_EQ(serial_port_->write(std::string("")), 0);
+
+  std::vector<uint8_t> std_vec {0x12, 0x34, 0xFF, 0x00};
+  EXPECT_EQ(serial_port_->write(std_vec), 4);
+  ::read(master_fd_, buf, 4);
+  EXPECT_EQ(static_cast<uint8_t>(buf[0]), 0x12);
+  EXPECT_EQ(static_cast<uint8_t>(buf[1]), 0x34);
+  EXPECT_EQ(static_cast<uint8_t>(buf[2]), 0xFF);
+  EXPECT_EQ(static_cast<uint8_t>(buf[3]), 0x00);
+
+  uint8_t vec[4] {0x21, 0x43, 0xF0, 0x0F};
+  EXPECT_EQ(serial_port_->write(vec, 4), 4);
+  ::read(master_fd_, buf, 4);
+  EXPECT_EQ(static_cast<uint8_t>(buf[0]), 0x21);
+  EXPECT_EQ(static_cast<uint8_t>(buf[1]), 0x43);
+  EXPECT_EQ(static_cast<uint8_t>(buf[2]), 0xF0);
+  EXPECT_EQ(static_cast<uint8_t>(buf[3]), 0x0F);
 }
 
 TEST_F(SerialTests, Timeout) {
-  // Timeout a read, returns an empty string
-  std::string empty = serial_port_->read();
-  EXPECT_EQ(empty, std::string(""));
-
-  // Ensure that writing/reading still works after a timeout.
-  ::write(master_fd_, "abc\n", 4);
-  std::string r = serial_port_->read(4);
-  EXPECT_EQ(r, std::string("abc\n"));
+  EXPECT_EQ(serial_port_->read(1), std::string(""));  // timeout
+  ::write(master_fd_, "abcd", 4);
+  EXPECT_EQ(serial_port_->read(4), std::string("abcd"));  // still works after a timeout
 }
 
 TEST_F(SerialTests, Flush) {
   ::write(master_fd_, "abcd1234", 8);
-  serial_port_->flush();
+  EXPECT_NO_THROW(serial_port_->flush());
   EXPECT_EQ(serial_port_->read(1), std::string(""));  // timeout
 
   ::write(master_fd_, "abcd1234", 8);
-  serial_port_->flushInput();
+  EXPECT_NO_THROW(serial_port_->flushInput());
   EXPECT_EQ(serial_port_->read(1), std::string(""));  // timeout
 
   char buf[5] = "";
-  serial_port_->write("abcd");
-  serial_port_->flush();
-  serial_port_->write("1234");
+  EXPECT_EQ(serial_port_->write("abcd"), 4);
+  EXPECT_NO_THROW(serial_port_->flush());
+  EXPECT_EQ(serial_port_->write("1234"), 4);
   ::read(master_fd_, buf, 4);
   EXPECT_EQ(std::string(buf, 4), std::string("1234"));
 
-  serial_port_->write("efgh");
-  serial_port_->flushOutput();
-  serial_port_->write("5678");
+  EXPECT_EQ(serial_port_->write("efgh"), 4);
+  EXPECT_NO_THROW(serial_port_->flushOutput());
+  EXPECT_EQ(serial_port_->write("5678"), 4);
   ::read(master_fd_, buf, 4);
   EXPECT_EQ(std::string(buf, 4), std::string("5678"));
-}
-
-TEST_F(SerialTests, PartialRead) {
-  // Write some data, but request more than was written.
-  ::write(master_fd_, "abc\n", 4);
-
-  // Should timeout, but return what was in the buffer.
-  std::string empty = serial_port_->read(10);
-  EXPECT_EQ(empty, std::string("abc\n"));
-
-  // Ensure that writing/reading still works after a timeout.
-  ::write(master_fd_, "abc\n", 4);
-  std::string r = serial_port_->read(4);
-  EXPECT_EQ(r, std::string("abc\n"));
 }
 #endif
 
