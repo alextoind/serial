@@ -186,10 +186,26 @@ TEST_F(SerialTests, Timeout) {
   EXPECT_EQ(serial_port_->read(4), std::string("abcd"));  // still works after a timeout
 }
 
+TEST_F(SerialTests, AvailableAndWait) {
+  EXPECT_EQ(serial_port_->available(), 0);
+  ::write(master_fd_, "abcd", 4);
+  EXPECT_TRUE(serial_port_->waitReadable());
+  EXPECT_EQ(serial_port_->available(), 4);
+  EXPECT_EQ(serial_port_->read(2), std::string("ab"));
+  EXPECT_EQ(serial_port_->available(), 2);
+  ::write(master_fd_, "efgh", 4);
+  EXPECT_TRUE(serial_port_->waitReadable());
+  //EXPECT_EQ(serial_port_->available(), 6);  TODO: this fails because it is too fast and there's already something available
+  EXPECT_EQ(serial_port_->read(8), std::string("cdefgh"));  //timeout
+  EXPECT_EQ(serial_port_->available(), 0);
+  EXPECT_FALSE(serial_port_->waitReadable());  //timeout
+}
+
 TEST_F(SerialTests, Flush) {
   ::write(master_fd_, "abcd1234", 8);
   EXPECT_NO_THROW(serial_port_->flush());
   EXPECT_EQ(serial_port_->read(1), std::string(""));  // timeout
+
   ::write(master_fd_, "abcd1234", 8);
   EXPECT_NO_THROW(serial_port_->flushInput());
   EXPECT_EQ(serial_port_->read(1), std::string(""));  // timeout
