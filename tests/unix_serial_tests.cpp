@@ -194,8 +194,8 @@ TEST_F(SerialTests, AvailableAndWait) {
   EXPECT_EQ(serial_port_->read(2), std::string("ab"));
   EXPECT_EQ(serial_port_->available(), 2);
   ::write(master_fd_, "efgh", 4);
-  EXPECT_TRUE(serial_port_->waitReadable());
-  //EXPECT_EQ(serial_port_->available(), 6);  TODO: this fails because it is too fast and there's already something available
+  serial_port_->waitByteTimes(4);  // waitReadable() is already true (there are 2 bytes in the buffer)
+  EXPECT_EQ(serial_port_->available(), 6);
   EXPECT_EQ(serial_port_->read(8), std::string("cdefgh"));  //timeout
   EXPECT_EQ(serial_port_->available(), 0);
   EXPECT_FALSE(serial_port_->waitReadable());  //timeout
