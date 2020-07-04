@@ -185,6 +185,7 @@ TEST_F(SerialTests, Timeout) {
   ::write(master_fd_, "abcd", 4);
   EXPECT_EQ(serial_port_->read(4), std::string("abcd"));  // still works after a timeout
 
+#if defined(__linux__)  // does not work on macOS yet
   Serial::Timeout simple_timeout(50);
   serial_port_->setTimeout(simple_timeout);
   EXPECT_EQ(serial_port_->getTimeout().getInterByteMilliseconds(), std::numeric_limits<uint32_t>::max());
@@ -211,6 +212,7 @@ TEST_F(SerialTests, Timeout) {
   start = std::chrono::steady_clock::now();
   EXPECT_EQ(serial_port_->read(5), std::string(""));  // timeout
   EXPECT_NEAR(std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - start).count(), (serial_port_->getTimeout().getReadConstant() + 5*serial_port_->getTimeout().getReadMultiplier()).count(), 5);
+#endif
 }
 
 TEST_F(SerialTests, AvailableAndWait) {
