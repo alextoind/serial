@@ -43,6 +43,7 @@ class SerialTests : public ::testing::Test {
     ASSERT_TRUE(slave_fd_ > 0);
     EXPECT_THAT(std::string(pty_name), ::testing::MatchesRegex("^/dev/.*"));
     EXPECT_NO_THROW(serial_port_ = std::unique_ptr<Serial>(new Serial(std::string(pty_name), 9600, Serial::Timeout(100))));
+    EXPECT_EQ(serial_port_->getPort(), std::string(pty_name));
   }
 
   void TearDown() override {
@@ -56,14 +57,26 @@ class SerialTests : public ::testing::Test {
 };
 
 TEST_F(SerialTests, OpenAndClose) {
-  // cannot use EXPECT_* because on failure the following would be influenced
-  ASSERT_TRUE(serial_port_->isOpen());
-  ASSERT_THROW(serial_port_->open(), SerialException);  // already open
-  ASSERT_TRUE(serial_port_->isOpen());
-  ASSERT_NO_THROW(serial_port_->close());
-  ASSERT_FALSE(serial_port_->isOpen());
-  ASSERT_NO_THROW(serial_port_->open());
-  ASSERT_TRUE(serial_port_->isOpen());
+  EXPECT_TRUE(serial_port_->isOpen());
+  EXPECT_THROW(serial_port_->open(), SerialException);  // already open
+  EXPECT_TRUE(serial_port_->isOpen());
+  EXPECT_NO_THROW(serial_port_->close());
+  EXPECT_FALSE(serial_port_->isOpen());
+  EXPECT_NO_THROW(serial_port_->open());
+  EXPECT_TRUE(serial_port_->isOpen());
+
+  std::string port = serial_port_->getPort();
+  EXPECT_NO_THROW(serial_port_->setPort(port));
+  EXPECT_TRUE(serial_port_->isOpen());
+  EXPECT_THROW(serial_port_->setPort(""), std::invalid_argument);
+  EXPECT_FALSE(serial_port_->isOpen());
+  EXPECT_NO_THROW(serial_port_->setPort("/dev/no_real_port"));
+  EXPECT_THROW(serial_port_->open(), IOException);  // invalid serial port
+  EXPECT_FALSE(serial_port_->isOpen());
+  EXPECT_NO_THROW(serial_port_->setPort(port));
+  EXPECT_FALSE(serial_port_->isOpen());
+  EXPECT_NO_THROW(serial_port_->open());
+  EXPECT_TRUE(serial_port_->isOpen());
 }
 
 TEST_F(SerialTests, Reads) {
