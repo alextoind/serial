@@ -184,6 +184,33 @@ TEST_F(SerialTests, Timeout) {
   EXPECT_EQ(serial_port_->read(1), std::string(""));  // timeout
   ::write(master_fd_, "abcd", 4);
   EXPECT_EQ(serial_port_->read(4), std::string("abcd"));  // still works after a timeout
+
+  Serial::Timeout simple_timeout(50);
+  serial_port_->setTimeout(simple_timeout);
+  EXPECT_EQ(serial_port_->getTimeout().getInterByteMilliseconds(), std::numeric_limits<uint32_t>::max());
+  EXPECT_EQ(serial_port_->getTimeout().getReadConstantMilliseconds(), 50);
+  EXPECT_EQ(serial_port_->getTimeout().getReadMultiplierMilliseconds(), 0);
+  EXPECT_EQ(serial_port_->getTimeout().getWriteConstantMilliseconds(), 50);
+  EXPECT_EQ(serial_port_->getTimeout().getWriteMultiplierMilliseconds(), 0);
+  auto start = std::chrono::steady_clock::now();
+  EXPECT_EQ(serial_port_->read(1), std::string(""));  // timeout
+  EXPECT_NEAR(std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - start).count(), serial_port_->getTimeout().getReadConstant().count(), 5);
+  start = std::chrono::steady_clock::now();
+  EXPECT_EQ(serial_port_->read(5), std::string(""));  // timeout
+  EXPECT_NEAR(std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - start).count(), serial_port_->getTimeout().getReadConstant().count(), 5);
+
+  serial_port_->setTimeout(0, 100, 20, 100, 0);  // complete_timeout
+  EXPECT_EQ(serial_port_->getTimeout().getInterByteMilliseconds(), 0);
+  EXPECT_EQ(serial_port_->getTimeout().getReadConstantMilliseconds(), 100);
+  EXPECT_EQ(serial_port_->getTimeout().getReadMultiplierMilliseconds(), 20);
+  EXPECT_EQ(serial_port_->getTimeout().getWriteConstantMilliseconds(), 100);
+  EXPECT_EQ(serial_port_->getTimeout().getWriteMultiplierMilliseconds(), 0);
+  start = std::chrono::steady_clock::now();
+  EXPECT_EQ(serial_port_->read(1), std::string(""));  // timeout
+  EXPECT_NEAR(std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - start).count(), (serial_port_->getTimeout().getReadConstant() + 1*serial_port_->getTimeout().getReadMultiplier()).count(), 5);
+  start = std::chrono::steady_clock::now();
+  EXPECT_EQ(serial_port_->read(5), std::string(""));  // timeout
+  EXPECT_NEAR(std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - start).count(), (serial_port_->getTimeout().getReadConstant() + 5*serial_port_->getTimeout().getReadMultiplier()).count(), 5);
 }
 
 TEST_F(SerialTests, AvailableAndWait) {
