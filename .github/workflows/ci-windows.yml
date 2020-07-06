@@ -18,7 +18,7 @@
 #  SOFTWARE.
 #
 
-name: CMake-CI-Windows
+name: Windows-Server-2019
 
 on:
   push:

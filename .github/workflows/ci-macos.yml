@@ -18,7 +18,7 @@
 #  SOFTWARE.
 #
 
-name: CMake-CI-macOS
+name: macOS-Catalina-10.15
 
 on:
   push:
