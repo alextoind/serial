@@ -85,8 +85,7 @@ std::string Serial::read(size_t size) {
   return buffer;
 }
 
-size_t Serial::readline(std::string &line, size_t size, std::string eol) {
-  std::lock_guard<std::mutex> read_lock(read_mutex_);
+size_t Serial::readline_(std::string &line, size_t size, std::string eol) {
   std::unique_ptr<uint8_t[]> buffer(new uint8_t[size]);
   size_t eol_len = eol.length();
   size_t read_so_far = 0;
@@ -104,40 +103,26 @@ size_t Serial::readline(std::string &line, size_t size, std::string eol) {
   return read_so_far;
 }
 
-std::string Serial::readline(size_t size, std::string eol) {
-  std::string buffer;
-  readline(buffer, size, eol);
-  return buffer;
+size_t Serial::readline(std::string &line, size_t size, std::string eol) {
+  std::lock_guard<std::mutex> read_lock(read_mutex_);
+  return readline_(line, size, eol);
 }
 
-//TODO: this method could use readline implementation and few hacks, but it should avoid to lock twice on mutex
+std::string Serial::readline(size_t size, std::string eol) {
+  std::lock_guard<std::mutex> read_lock(read_mutex_);
+  std::string line;
+  readline_(line, size, eol);
+  return line;
+}
+
 std::vector<std::string> Serial::readlines(size_t size, std::string eol) {
   std::lock_guard<std::mutex> read_lock(read_mutex_);
   std::vector<std::string> lines;
-  std::unique_ptr<uint8_t[]> buffer(new uint8_t[size]);
-  size_t eol_len = eol.length();
-  size_t read_so_far = 0;
-  size_t start_of_line = 0;
-  while (read_so_far < size) {
-    size_t bytes_read = pimpl_->read(buffer.get() + read_so_far, 1);
-    read_so_far += bytes_read;
-    if (bytes_read == 0) {
-      if (start_of_line != read_so_far) {
-        lines.push_back(std::string(reinterpret_cast<const char *>(buffer.get() + start_of_line), read_so_far - start_of_line));
-      }
-      break; // Timeout occurred on reading 1 byte
-    }
-    if (read_so_far >= eol_len && std::string(reinterpret_cast<const char *>(buffer.get() + read_so_far - eol_len), eol_len) == eol) {
-      // EOL found
-      lines.push_back(std::string(reinterpret_cast<const char *>(buffer.get() + start_of_line), read_so_far - start_of_line));
-      start_of_line = read_so_far;
-    }
-    if (read_so_far == size) {
-      if (start_of_line != read_so_far) {
-        lines.push_back(std::string(reinterpret_cast<const char *>(buffer.get() + start_of_line), read_so_far - start_of_line));
-      }
-      break; // Reached the maximum read length
-    }
+  std::string line;
+  while (readline_(line, size, eol) > 0) {
+    lines.push_back(line);
+    size -= line.size();
+    line.clear();
   }
   return lines;
 }

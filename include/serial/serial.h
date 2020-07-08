@@ -592,6 +592,8 @@ class Serial {
 
   std::mutex read_mutex_;
   std::mutex write_mutex_;
+
+  size_t readline_(std::string &line, size_t size = 65536, std::string eol = "\n");  // core method which does not lock on mutex
 };
 
 class SerialException : public std::exception {
