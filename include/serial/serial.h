@@ -108,12 +108,12 @@ class Serial {
     uint32_t getWriteMultiplierMilliseconds() { return write_multiplier_.count(); }
 
     std::chrono::steady_clock::time_point getReadDeadline() { return getReadDeadline(0); }
-    std::chrono::steady_clock::time_point getReadDeadline(const size_t &size) {
+    std::chrono::steady_clock::time_point getReadDeadline(size_t size) {
       return std::chrono::steady_clock::now() + read_constant_ + read_multiplier_*size;
     }
 
     std::chrono::steady_clock::time_point getWriteDeadline() { return getWriteDeadline(0); }
-    std::chrono::steady_clock::time_point getWriteDeadline(const size_t &size) {
+    std::chrono::steady_clock::time_point getWriteDeadline(size_t size) {
       return std::chrono::steady_clock::now() + write_constant_ + write_multiplier_*size;
     }
 
@@ -288,7 +288,7 @@ class Serial {
    * \throw serial::PortNotOpenedException
    * \throw serial::SerialException
    */
-  size_t readline(std::string &line, size_t size = 65536, std::string eol = "\n");
+  size_t readline(std::string &line, size_t size = 65536, const std::string &eol = "\n");
 
   /*! Reads in a line or until a given delimiter has been processed.
    *
@@ -302,7 +302,7 @@ class Serial {
    * \throw serial::PortNotOpenedException
    * \throw serial::SerialException
    */
-  std::string readline(size_t size = 65536, std::string eol = "\n");
+  std::string readline(size_t size = 65536, const std::string &eol = "\n");
 
   /*! Reads in multiple lines until the serial port times out.
    *
@@ -318,7 +318,7 @@ class Serial {
    * \throw serial::PortNotOpenedException
    * \throw serial::SerialException
    */
-  std::vector<std::string> readlines(size_t size = 65536, std::string eol = "\n");
+  std::vector<std::string> readlines(size_t size = 65536, const std::string &eol = "\n");
 
   /*! Write a string to the serial port.
    *
@@ -593,7 +593,7 @@ class Serial {
   std::mutex read_mutex_;
   std::mutex write_mutex_;
 
-  size_t readline_(std::string &line, size_t size = 65536, std::string eol = "\n");  // core method which does not lock on mutex
+  size_t readline_(std::string &line, size_t size = 65536, const std::string &eol = "\n");  // core method which does not lock on mutex
 };
 
 class SerialException : public std::exception {

@@ -31,7 +31,7 @@ Serial::Serial(const std::string &port, uint32_t baudrate, Serial::Timeout timeo
 }
 
 Serial::~Serial() {
-  // pimpl_ is automatically destroyed and close() is called inside pimpl_ destructor
+// pimpl_ is automatically destroyed and close() is called inside pimpl_ destructor
 }
 
 void Serial::open() {
@@ -85,7 +85,7 @@ std::string Serial::read(size_t size) {
   return buffer;
 }
 
-size_t Serial::readline_(std::string &line, size_t size, std::string eol) {
+size_t Serial::readline_(std::string &line, size_t size, const std::string &eol) {
   std::unique_ptr<uint8_t[]> buffer(new uint8_t[size]);
   size_t eol_len = eol.length();
   size_t read_so_far = 0;
@@ -103,19 +103,19 @@ size_t Serial::readline_(std::string &line, size_t size, std::string eol) {
   return read_so_far;
 }
 
-size_t Serial::readline(std::string &line, size_t size, std::string eol) {
+size_t Serial::readline(std::string &line, size_t size, const std::string &eol) {
   std::lock_guard<std::mutex> read_lock(read_mutex_);
   return readline_(line, size, eol);
 }
 
-std::string Serial::readline(size_t size, std::string eol) {
+std::string Serial::readline(size_t size, const std::string &eol) {
   std::lock_guard<std::mutex> read_lock(read_mutex_);
   std::string line;
   readline_(line, size, eol);
   return line;
 }
 
-std::vector<std::string> Serial::readlines(size_t size, std::string eol) {
+std::vector<std::string> Serial::readlines(size_t size, const std::string &eol) {
   std::lock_guard<std::mutex> read_lock(read_mutex_);
   std::vector<std::string> lines;
   std::string line;
