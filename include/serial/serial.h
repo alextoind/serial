@@ -168,6 +168,9 @@ class Serial {
   /*! Destructor */
   virtual ~Serial();
 
+  Serial(const Serial &) = delete;
+  Serial &operator=(const Serial &) = delete;
+
   /*!
    * Opens the serial port as long as the port is set and the port isn't
    * already open.
@@ -582,14 +585,8 @@ class Serial {
   bool getCD();
 
  private:
-  // Disable copy constructors
-  Serial(const Serial &);
-  Serial &operator=(const Serial &);
-
-  // Pimpl idiom, d_pointer
   class SerialImpl;
   std::unique_ptr<SerialImpl> pimpl_;
-
   std::mutex read_mutex_;
   std::mutex write_mutex_;
 
@@ -597,11 +594,8 @@ class Serial {
 };
 
 class SerialException : public std::exception {
-  // Disable copy constructors
-  SerialException &operator=(const SerialException &);
-  std::string e_what_;
  public:
-  SerialException(const char *description) {
+  explicit SerialException(const char *description) {
     std::stringstream ss;
     ss << "SerialException " << description << " failed.";
     e_what_ = ss.str();
@@ -610,19 +604,18 @@ class SerialException : public std::exception {
   SerialException(const SerialException &other)
       : e_what_(other.e_what_) {}
 
-  virtual ~SerialException() throw() {}
-  virtual const char *what() const throw() {
+  SerialException &operator=(const SerialException &) = delete;
+
+  ~SerialException() noexcept override = default;
+  const char *what() const noexcept override {
     return e_what_.c_str();
   }
+
+ private:
+  std::string e_what_;
 };
 
 class IOException : public std::exception {
-  // Disable copy constructors
-  IOException &operator=(const IOException &);
-  std::string file_;
-  int line_;
-  std::string e_what_;
-  int errno_;
  public:
   explicit IOException(std::string file, int line, int errnum)
       : file_(file),
@@ -650,27 +643,31 @@ class IOException : public std::exception {
     e_what_ = ss.str();
   }
 
-  virtual ~IOException() throw() {}
-
   IOException(const IOException &other)
       : line_(other.line_),
         e_what_(other.e_what_),
         errno_(other.errno_) {}
 
+  IOException &operator=(const IOException &) = delete;
+
+  ~IOException() noexcept override = default;
+
   int getErrorNumber() const { return errno_; }
 
-  virtual const char *what() const throw() {
+  const char *what() const noexcept override {
     return e_what_.c_str();
   }
+
+ private:
+  std::string file_;
+  int line_;
+  std::string e_what_;
+  int errno_;
 };
 
 class PortNotOpenedException : public std::exception {
-  // Disable copy constructors
-  const PortNotOpenedException &operator=(PortNotOpenedException);
-
-  std::string e_what_;
  public:
-  PortNotOpenedException(const char *description) {
+  explicit PortNotOpenedException(const char *description) {
     std::stringstream ss;
     ss << "PortNotOpenedException " << description << " failed.";
     e_what_ = ss.str();
@@ -679,11 +676,16 @@ class PortNotOpenedException : public std::exception {
   PortNotOpenedException(const PortNotOpenedException &other)
       : e_what_(other.e_what_) {}
 
-  virtual ~PortNotOpenedException() throw() {}
+  PortNotOpenedException &operator=(PortNotOpenedException) = delete;
 
-  virtual const char *what() const throw() {
+  ~PortNotOpenedException() noexcept override = default;
+
+  const char *what() const noexcept override {
     return e_what_.c_str();
   }
+
+ private:
+  std::string e_what_;
 };
 
 /*!
