@@ -31,9 +31,6 @@
 #include <string>
 #include <vector>
 
-#define THROW(exceptionClass, message) throw exceptionClass(__FILE__, \
-__LINE__, (message) )
-
 namespace serial {
 
 /*!
@@ -593,99 +590,27 @@ class Serial {
   size_t readline_(std::string &line, size_t size = 65536, const std::string &eol = "\n");  // core method which does not lock on mutex
 };
 
-class SerialException : public std::exception {
+class SerialException : public std::runtime_error {
  public:
-  explicit SerialException(const char *description) {
-    std::stringstream ss;
-    ss << "SerialException " << description << " failed.";
-    e_what_ = ss.str();
-  }
-
-  SerialException(const SerialException &other)
-      : e_what_(other.e_what_) {}
-
-  SerialException &operator=(const SerialException &) = delete;
-
-  ~SerialException() noexcept override = default;
-  const char *what() const noexcept override {
-    return e_what_.c_str();
-  }
-
- private:
-  std::string e_what_;
+  SerialException() : SerialException("generic fault") {}
+  explicit SerialException(const std::string &what_arg) : std::runtime_error("Serial Exception: " + what_arg + ".") {}
 };
 
-class IOException : public std::exception {
+class SerialInvalidArgumentException : public std::invalid_argument {
  public:
-  explicit IOException(std::string file, int line, int errnum)
-      : file_(file),
-        line_(line),
-        errno_(errnum) {
-    std::stringstream ss;
-#if defined(_WIN32) && !defined(__MINGW32__)
-    char error_str [1024];
-    strerror_s(error_str, 1024, errnum);
-#else
-    char *error_str = strerror(errnum);
-#endif
-    ss << "IO Exception (" << errno_ << "): " << error_str;
-    ss << ", file " << file_ << ", line " << line_ << ".";
-    e_what_ = ss.str();
-  }
-
-  explicit IOException(std::string file, int line, const char *description)
-      : file_(file),
-        line_(line),
-        errno_(0) {
-    std::stringstream ss;
-    ss << "IO Exception: " << description;
-    ss << ", file " << file_ << ", line " << line_ << ".";
-    e_what_ = ss.str();
-  }
-
-  IOException(const IOException &other)
-      : line_(other.line_),
-        e_what_(other.e_what_),
-        errno_(other.errno_) {}
-
-  IOException &operator=(const IOException &) = delete;
-
-  ~IOException() noexcept override = default;
-
-  int getErrorNumber() const { return errno_; }
-
-  const char *what() const noexcept override {
-    return e_what_.c_str();
-  }
-
- private:
-  std::string file_;
-  int line_;
-  std::string e_what_;
-  int errno_;
+  SerialInvalidArgumentException() : SerialInvalidArgumentException("generic fault") {}
+  explicit SerialInvalidArgumentException(const std::string &what_arg) : std::invalid_argument("Serial Invalid Argument Exception: " + what_arg + ".") {}
 };
 
-class PortNotOpenedException : public std::exception {
+class SerialIOException : public std::runtime_error {
  public:
-  explicit PortNotOpenedException(const char *description) {
-    std::stringstream ss;
-    ss << "PortNotOpenedException " << description << " failed.";
-    e_what_ = ss.str();
-  }
+  SerialIOException() : SerialIOException("generic fault") {}
+  explicit SerialIOException(const std::string &what_arg) : std::runtime_error("Serial IO Exception: " + what_arg + ", errno has been set to '" + std::to_string(errno) + "'.") {}
+};
 
-  PortNotOpenedException(const PortNotOpenedException &other)
-      : e_what_(other.e_what_) {}
-
-  PortNotOpenedException &operator=(PortNotOpenedException) = delete;
-
-  ~PortNotOpenedException() noexcept override = default;
-
-  const char *what() const noexcept override {
-    return e_what_.c_str();
-  }
-
- private:
-  std::string e_what_;
+class SerialPortNotOpenException : public std::runtime_error {
+ public:
+  SerialPortNotOpenException() : std::runtime_error("Serial Port Not Open Exception.") {}
 };
 
 /*!

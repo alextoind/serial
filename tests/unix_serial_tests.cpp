@@ -71,7 +71,7 @@ TEST_F(SerialTests, OpenAndClose) {
   EXPECT_THROW(serial_port_->setPort(""), std::invalid_argument);
   EXPECT_FALSE(serial_port_->isOpen());
   EXPECT_NO_THROW(serial_port_->setPort("/dev/no_real_port"));
-  EXPECT_THROW(serial_port_->open(), IOException);  // invalid serial port
+  EXPECT_THROW(serial_port_->open(), SerialIOException);  // invalid serial port
   EXPECT_FALSE(serial_port_->isOpen());
   EXPECT_NO_THROW(serial_port_->setPort(port));
   EXPECT_FALSE(serial_port_->isOpen());
