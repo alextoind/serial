@@ -54,10 +54,10 @@ Serial::SerialImpl::~SerialImpl() {
 
 void Serial::SerialImpl::open() {
   if (port_.empty()) {
-    throw SerialInvalidArgumentException("Empty port is invalid.");
+    throw SerialInvalidArgumentException("empty port is invalid.");
   }
   if (is_open_) {
-    throw SerialException("Serial port already open.");  //TODO: actually there is no need to throw exception in this case
+    throw SerialException("serial port already open.");  //TODO: actually there is no need to throw exception in this case
   }
 
   fd_ = ::open(port_.c_str(), O_RDWR | O_NOCTTY | O_NONBLOCK);
@@ -70,7 +70,7 @@ void Serial::SerialImpl::open() {
         return;
       case ENFILE:
       case EMFILE:
-        throw SerialIOException("Too many file handles open.");
+        throw SerialIOException("too many file handles open.");
       default:
         throw SerialIOException();
     }
@@ -83,13 +83,13 @@ void Serial::SerialImpl::open() {
 void Serial::SerialImpl::reconfigurePort() {
   if (fd_ == -1) {
     // Can only operate on a valid file descriptor
-    throw SerialIOException("Invalid file descriptor, is the serial port open?");
+    throw SerialIOException("invalid file descriptor, is the serial port open?");
   }
 
   struct termios options; // The options for the file descriptor
 
   if (tcgetattr(fd_, &options) == -1) {
-    throw SerialIOException("::tcgetattr");
+    throw SerialIOException("tcgetattr() fails during reconfigurePort()");
   }
 
   // set up raw mode / no echo / binary
@@ -760,19 +760,8 @@ void Serial::SerialImpl::setBreak(bool level) const {
   if (!is_open_) {
     throw SerialPortNotOpenException();
   }
-
-  if (level) {
-    if (-1 == ioctl(fd_, TIOCSBRK)) {
-      std::stringstream ss;
-      ss << "setBreak failed on a call to ioctl(TIOCSBRK): " << errno << " " << strerror(errno);
-      throw (SerialException(ss.str().c_str()));
-    }
-  } else {
-    if (-1 == ioctl(fd_, TIOCCBRK)) {
-      std::stringstream ss;
-      ss << "setBreak failed on a call to ioctl(TIOCCBRK): " << errno << " " << strerror(errno);
-      throw (SerialException(ss.str().c_str()));
-    }
+  if (-1 == ioctl(fd_, level ? TIOCSBRK : TIOCCBRK)) {
+    throw (SerialIOException("setBreak() failed on a call to ioctl()"));
   }
 }
 
@@ -780,21 +769,9 @@ void Serial::SerialImpl::setRTS(bool level) const {
   if (!is_open_) {
     throw SerialPortNotOpenException();
   }
-
   int command = TIOCM_RTS;
-
-  if (level) {
-    if (-1 == ioctl(fd_, TIOCMBIS, &command)) {
-      std::stringstream ss;
-      ss << "setRTS failed on a call to ioctl(TIOCMBIS): " << errno << " " << strerror(errno);
-      throw (SerialException(ss.str().c_str()));
-    }
-  } else {
-    if (-1 == ioctl(fd_, TIOCMBIC, &command)) {
-      std::stringstream ss;
-      ss << "setRTS failed on a call to ioctl(TIOCMBIC): " << errno << " " << strerror(errno);
-      throw (SerialException(ss.str().c_str()));
-    }
+  if (-1 == ioctl(fd_, level ? TIOCMBIS : TIOCMBIC, &command)) {
+    throw (SerialIOException("setRTS() failed on a call to ioctl()"));
   }
 }
 
@@ -802,48 +779,30 @@ void Serial::SerialImpl::setDTR(bool level) const {
   if (!is_open_) {
     throw SerialPortNotOpenException();
   }
-
   int command = TIOCM_DTR;
-
-  if (level) {
-    if (-1 == ioctl(fd_, TIOCMBIS, &command)) {
-      std::stringstream ss;
-      ss << "setDTR failed on a call to ioctl(TIOCMBIS): " << errno << " " << strerror(errno);
-      throw (SerialException(ss.str().c_str()));
-    }
-  } else {
-    if (-1 == ioctl(fd_, TIOCMBIC, &command)) {
-      std::stringstream ss;
-      ss << "setDTR failed on a call to ioctl(TIOCMBIC): " << errno << " " << strerror(errno);
-      throw (SerialException(ss.str().c_str()));
-    }
+  if (-1 == ioctl(fd_, level ? TIOCMBIS : TIOCMBIC, &command)) {
+    throw (SerialIOException("setDTR() failed on a call to ioctl()"));
   }
 }
 
+//TODO: check Windows implementation before fixes
 bool Serial::SerialImpl::waitForChange() const {
 #ifndef TIOCMIWAIT
-  while (is_open_ == true) {
+  while (is_open_ == true) {  //TODO: should throw like other methods if it is not open
     int status;
     if (-1 == ioctl(fd_, TIOCMGET, &status)) {
-      std::stringstream ss;
-      ss << "waitForChange failed on a call to ioctl(TIOCMGET): " << errno << " " << strerror(errno);
-      throw (SerialException(ss.str().c_str()));
-    } else {
-      if (0 != (status & TIOCM_CTS) || 0 != (status & TIOCM_DSR) || 0 != (status & TIOCM_RI) ||
-          0 != (status & TIOCM_CD)) {
-        return true;
-      }
+      throw (SerialIOException("waitForChange() failed on a call to ioctl(TIOCMGET)"));
     }
-    usleep(1000);
+    if ((status & TIOCM_CTS) != 0 || (status & TIOCM_DSR) != 0 || (status & TIOCM_RI) != 0 || (status & TIOCM_CD) != 0) {
+      return true;
+    }
+    //FIXME: possible infinite loop
+    std::this_thread::sleep_for(std::chrono::microseconds(1000));
   }
-  return false;
+  return false;  //FIXME: if TIOCMIWAIT is defined this never happens
 #else
-  int command = (TIOCM_CD | TIOCM_DSR | TIOCM_RI | TIOCM_CTS);
-
-  if (-1 == ioctl(fd_, TIOCMIWAIT, command)) {
-    std::stringstream ss;
-    ss << "waitForChange failed on a call to ioctl(TIOCMIWAIT): " << errno << " " << strerror(errno);
-    throw (SerialException(ss.str().c_str()));
+  if (-1 == ioctl(fd_, TIOCMIWAIT, TIOCM_CD | TIOCM_DSR | TIOCM_RI | TIOCM_CTS)) {
+    throw (SerialIOException("waitForChange() failed on a call to ioctl()"));
   }
   return true;
 #endif
@@ -853,60 +812,44 @@ bool Serial::SerialImpl::getCTS() const {
   if (!is_open_) {
     throw SerialPortNotOpenException();
   }
-
   int status;
   if (-1 == ioctl(fd_, TIOCMGET, &status)) {
-    std::stringstream ss;
-    ss << "getCTS failed on a call to ioctl(TIOCMGET): " << errno << " " << strerror(errno);
-    throw (SerialException(ss.str().c_str()));
-  } else {
-    return 0 != (status & TIOCM_CTS);
+    throw (SerialIOException("getCTS() failed on a call to ioctl()"));
   }
+  return (status & TIOCM_CTS) != 0;
 }
 
 bool Serial::SerialImpl::getDSR() const {
   if (!is_open_) {
     throw SerialPortNotOpenException();
   }
-
   int status;
   if (-1 == ioctl(fd_, TIOCMGET, &status)) {
-    std::stringstream ss;
-    ss << "getDSR failed on a call to ioctl(TIOCMGET): " << errno << " " << strerror(errno);
-    throw (SerialException(ss.str().c_str()));
-  } else {
-    return 0 != (status & TIOCM_DSR);
+    throw (SerialIOException("getDSR() failed on a call to ioctl()"));
   }
+  return (status & TIOCM_DSR) != 0;
 }
 
 bool Serial::SerialImpl::getRI() const {
   if (!is_open_) {
     throw SerialPortNotOpenException();
   }
-
   int status;
   if (-1 == ioctl(fd_, TIOCMGET, &status)) {
-    std::stringstream ss;
-    ss << "getRI failed on a call to ioctl(TIOCMGET): " << errno << " " << strerror(errno);
-    throw (SerialException(ss.str().c_str()));
-  } else {
-    return 0 != (status & TIOCM_RI);
+    throw (SerialIOException("getRI() failed on a call to ioctl()"));
   }
+  return (status & TIOCM_RI) != 0;
 }
 
 bool Serial::SerialImpl::getCD() const {
   if (!is_open_) {
     throw SerialPortNotOpenException();
   }
-
   int status;
   if (-1 == ioctl(fd_, TIOCMGET, &status)) {
-    std::stringstream ss;
-    ss << "getCD failed on a call to ioctl(TIOCMGET): " << errno << " " << strerror(errno);
-    throw (SerialException(ss.str().c_str()));
-  } else {
-    return 0 != (status & TIOCM_CD);
+    throw (SerialIOException("getCD() failed on a call to ioctl()"));
   }
+  return (status & TIOCM_CD) != 0;
 }
 
 #endif  // !defined(_WIN32)

@@ -31,6 +31,7 @@
 #include <sys/ioctl.h>
 #include <termios.h>
 #include <unistd.h>
+#include <thread>
 
 #if defined(__linux__)
 #include <linux/serial.h>
