@@ -138,7 +138,7 @@ class Serial::SerialImpl {
   std::string port_;               // Path to the file descriptor
   int fd_;                    // The current file descriptor
 #else
-  std::wstring port_;               // Path to the file descriptor
+  std::wstring port_;               // Path to the file descriptor  //TODO: this should be a std::string and should be converted only during CreateFileW()
   HANDLE fd_;
 #endif
 
