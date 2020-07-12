@@ -31,9 +31,6 @@
 #include <string>
 #include <vector>
 
-#define THROW(exceptionClass, message) throw exceptionClass(__FILE__, \
-__LINE__, (message) )
-
 namespace serial {
 
 /*!
@@ -157,9 +154,9 @@ class Serial {
    * flowcontrol_none, possible values are: flowcontrol_none,
    * flowcontrol_software, flowcontrol_hardware
    *
-   * \throw serial::PortNotOpenedException
-   * \throw serial::IOException
-   * \throw std::invalid_argument
+   * \throw serial::SerialIOException
+   * \throw serial::SerialInvalidArgumentException
+   * \throw serial::SerialPortNotOpenException
    */
   explicit Serial(const std::string &port = "", uint32_t baudrate = 9600, Timeout timeout = Timeout(),
                   bytesize_t bytesize = eightbits, parity_t parity = parity_none, stopbits_t stopbits = stopbits_one,
@@ -180,9 +177,9 @@ class Serial {
    *
    * \see Serial::Serial
    *
-   * \throw std::invalid_argument
    * \throw serial::SerialException
-   * \throw serial::IOException
+   * \throw serial::SerialIOException
+   * \throw serial::SerialInvalidArgumentException
    */
   void open();
 
@@ -192,22 +189,34 @@ class Serial {
    */
   bool isOpen() const;
 
-  /*! Closes the serial port. */
+  /*! Closes the serial port.
+   *
+   * \throw serial::SerialIOException
+   */
   void close();
 
-  /*! Return the number of characters in the buffer. */
+  /*! Return the number of characters in the buffer.
+   *
+   * \throw serial::SerialIOException
+   */
   size_t available();
 
   /*! Block until there is serial data to read or read_timeout_constant
    * number of milliseconds have elapsed. The return value is true when
    * the function exits with the port in a readable state, false otherwise
-   * (due to timeout or select interruption). */
+   * (due to timeout or select interruption).
+   * Implemented only on Unix.
+   *
+   * \throw serial::SerialIOException
+   */
   bool waitReadable();
 
   /*! Block for a period of time corresponding to the transmission time of
    * count characters at present serial settings. This may be used in con-
    * junction with waitReadable to read larger blocks of data from the
-   * port. */
+   * port.
+   * Implemented only on Unix.
+   */
   void waitByteTimes(size_t count);
 
   /*! Read a given amount of bytes from the serial port into a given buffer.
@@ -235,8 +244,9 @@ class Serial {
    * \return A size_t representing the number of bytes read as a result of the
    *         call to read.
    *
-   * \throw serial::PortNotOpenedException
-   * \throw serial::SerialException
+   * \throw serial::SerialException  TODO: actually thrown only by Unix
+   * \throw serial::SerialIOException  TODO: actually thrown only by Windows
+   * \throw serial::SerialPortNotOpenException
    */
   size_t read(uint8_t *buffer, size_t size);
 
@@ -248,8 +258,9 @@ class Serial {
    * \return A size_t representing the number of bytes read as a result of the
    *         call to read.
    *
-   * \throw serial::PortNotOpenedException
-   * \throw serial::SerialException
+   * \throw serial::SerialException  TODO: actually thrown only by Unix
+   * \throw serial::SerialIOException  TODO: actually thrown only by Windows
+   * \throw serial::SerialPortNotOpenException
    */
   size_t read(std::vector<uint8_t> &buffer, size_t size = 1);
 
@@ -261,8 +272,9 @@ class Serial {
    * \return A size_t representing the number of bytes read as a result of the
    *         call to read.
    *
-   * \throw serial::PortNotOpenedException
-   * \throw serial::SerialException
+   * \throw serial::SerialException  TODO: actually thrown only by Unix
+   * \throw serial::SerialIOException  TODO: actually thrown only by Windows
+   * \throw serial::SerialPortNotOpenException
    */
   size_t read(std::string &buffer, size_t size = 1);
 
@@ -273,8 +285,9 @@ class Serial {
    *
    * \return A std::string containing the data read from the port.
    *
-   * \throw serial::PortNotOpenedException
-   * \throw serial::SerialException
+   * \throw serial::SerialException  TODO: actually thrown only by Unix
+   * \throw serial::SerialIOException  TODO: actually thrown only by Windows
+   * \throw serial::SerialPortNotOpenException
    */
   std::string read(size_t size = 1);
 
@@ -288,8 +301,9 @@ class Serial {
    *
    * \return A size_t representing the number of bytes read.
    *
-   * \throw serial::PortNotOpenedException
-   * \throw serial::SerialException
+   * \throw serial::SerialException  TODO: actually thrown only by Unix
+   * \throw serial::SerialIOException  TODO: actually thrown only by Windows
+   * \throw serial::SerialPortNotOpenException
    */
   size_t readline(std::string &line, size_t size = 65536, const std::string &eol = "\n");
 
@@ -302,8 +316,9 @@ class Serial {
    *
    * \return A std::string containing the line.
    *
-   * \throw serial::PortNotOpenedException
-   * \throw serial::SerialException
+   * \throw serial::SerialException  TODO: actually thrown only by Unix
+   * \throw serial::SerialIOException  TODO: actually thrown only by Windows
+   * \throw serial::SerialPortNotOpenException
    */
   std::string readline(size_t size = 65536, const std::string &eol = "\n");
 
@@ -318,8 +333,9 @@ class Serial {
    *
    * \return A vector<string> containing the lines.
    *
-   * \throw serial::PortNotOpenedException
-   * \throw serial::SerialException
+   * \throw serial::SerialException  TODO: actually thrown only by Unix
+   * \throw serial::SerialIOException  TODO: actually thrown only by Windows
+   * \throw serial::SerialPortNotOpenException
    */
   std::vector<std::string> readlines(size_t size = 65536, const std::string &eol = "\n");
 
@@ -334,9 +350,9 @@ class Serial {
    * \return A size_t representing the number of bytes actually written to
    * the serial port.
    *
-   * \throw serial::PortNotOpenedException
-   * \throw serial::SerialException
-   * \throw serial::IOException
+   * \throw serial::SerialException  TODO: actually thrown only by Unix
+   * \throw serial::SerialIOException
+   * \throw serial::SerialPortNotOpenException
    */
   size_t write(const uint8_t *data, size_t size);
 
@@ -348,9 +364,9 @@ class Serial {
    * \return A size_t representing the number of bytes actually written to
    * the serial port.
    *
-   * \throw serial::PortNotOpenedException
-   * \throw serial::SerialException
-   * \throw serial::IOException
+   * \throw serial::SerialException  TODO: actually thrown only by Unix
+   * \throw serial::SerialIOException
+   * \throw serial::SerialPortNotOpenException
    */
   size_t write(const std::vector<uint8_t> &data);
 
@@ -362,9 +378,9 @@ class Serial {
    * \return A size_t representing the number of bytes actually written to
    * the serial port.
    *
-   * \throw serial::PortNotOpenedException
-   * \throw serial::SerialException
-   * \throw serial::IOException
+   * \throw serial::SerialException  TODO: actually thrown only by Unix
+   * \throw serial::SerialIOException
+   * \throw serial::SerialPortNotOpenException
    */
   size_t write(const std::string &data);
 
@@ -374,15 +390,15 @@ class Serial {
    * serial port, which would be something like 'COM1' on Windows and
    * '/dev/ttyS0' on Linux.
    *
-   * \throw std::invalid_argument
+   * \throw serial::SerialException
+   * \throw serial::SerialIOException
+   * \throw serial::SerialInvalidArgumentException
    */
   void setPort(const std::string &port);
 
   /*! Gets the serial port identifier.
    *
    * \see Serial::setPort
-   *
-   * \throw std::invalid_argument
    */
   std::string getPort() const;
 
@@ -421,10 +437,17 @@ class Serial {
    * timeout, and the read and write timeout constants and multipliers.
    *
    * \see serial::Timeout
+   *
+   * \throw serial::SerialIOException
+   * \throw serial::SerialInvalidArgumentException
    */
   void setTimeout(Timeout &timeout);
 
-  /*! Sets the timeout for reads and writes. */
+  /*! Sets the timeout for reads and writes.
+   *
+   * \throw serial::SerialIOException
+   * \throw serial::SerialInvalidArgumentException
+   */
   void setTimeout(uint32_t inter_byte_timeout, uint32_t read_timeout_constant, uint32_t read_timeout_multiplier,
                   uint32_t write_timeout_constant, uint32_t write_timeout_multiplier) {
     Timeout timeout(inter_byte_timeout, read_timeout_constant, read_timeout_multiplier, write_timeout_constant,
@@ -451,7 +474,8 @@ class Serial {
    *
    * \param baudrate An integer that sets the baud rate for the serial port.
    *
-   * \throw std::invalid_argument
+   * \throw serial::SerialIOException
+   * \throw serial::SerialInvalidArgumentException
    */
   void setBaudrate(uint32_t baudrate);
 
@@ -460,8 +484,6 @@ class Serial {
    * \return An integer that sets the baud rate for the serial port.
    *
    * \see Serial::setBaudrate
-   *
-   * \throw std::invalid_argument
    */
   uint32_t getBaudrate() const;
 
@@ -471,15 +493,14 @@ class Serial {
    * default is eightbits, possible values are: fivebits, sixbits, sevenbits,
    * eightbits
    *
-   * \throw std::invalid_argument
+   * \throw serial::SerialIOException
+   * \throw serial::SerialInvalidArgumentException
    */
   void setBytesize(bytesize_t bytesize);
 
   /*! Gets the bytesize for the serial port.
    *
    * \see Serial::setBytesize
-   *
-   * \throw std::invalid_argument
    */
   bytesize_t getBytesize() const;
 
@@ -488,15 +509,14 @@ class Serial {
    * \param parity Method of parity, default is parity_none, possible values
    * are: parity_none, parity_odd, parity_even
    *
-   * \throw std::invalid_argument
+   * \throw serial::SerialIOException
+   * \throw serial::SerialInvalidArgumentException
    */
   void setParity(parity_t parity);
 
   /*! Gets the parity for the serial port.
    *
    * \see Serial::setParity
-   *
-   * \throw std::invalid_argument
    */
   parity_t getParity() const;
 
@@ -505,15 +525,14 @@ class Serial {
    * \param stopbits Number of stop bits used, default is stopbits_one,
    * possible values are: stopbits_one, stopbits_one_point_five, stopbits_two
    *
-   * \throw std::invalid_argument
+   * \throw serial::SerialIOException
+   * \throw serial::SerialInvalidArgumentException
    */
   void setStopbits(stopbits_t stopbits);
 
   /*! Gets the stopbits for the serial port.
    *
    * \see Serial::setStopbits
-   *
-   * \throw std::invalid_argument
    */
   stopbits_t getStopbits() const;
 
@@ -523,37 +542,61 @@ class Serial {
    * possible values are: flowcontrol_none, flowcontrol_software,
    * flowcontrol_hardware
    *
-   * \throw std::invalid_argument
+   * \throw serial::SerialIOException
+   * \throw serial::SerialInvalidArgumentException
    */
   void setFlowcontrol(flowcontrol_t flowcontrol);
 
   /*! Gets the flow control for the serial port.
    *
    * \see Serial::setFlowcontrol
-   *
-   * \throw std::invalid_argument
    */
   flowcontrol_t getFlowcontrol() const;
 
-  /*! Flush the input and output buffers */
+  /*! Flush the input and output buffers
+   *
+   * \throw serial::SerialPortNotOpenException
+   */
   void flush();
 
-  /*! Flush only the input buffer */
+  /*! Flush only the input buffer
+   *
+   * \throw serial::SerialPortNotOpenException
+   */
   void flushInput();
 
-  /*! Flush only the output buffer */
+  /*! Flush only the output buffer
+   *
+   * \throw serial::SerialPortNotOpenException
+   */
   void flushOutput();
 
-  /*! Sends the RS-232 break signal.  See tcsendbreak(3). */
+  /*! Sends the RS-232 break signal.  See tcsendbreak(3).
+   *  Implemented only on Unix.
+   *
+   * \throw serial::SerialPortNotOpenException
+   */
   void sendBreak(int duration);
 
-  /*! Set the break condition to a given level.  Defaults to true. */
+  /*! Set the break condition to a given level.  Defaults to true.
+   *
+   * \throw serial::SerialIOException  TODO: actually thrown only by Unix
+   * \throw serial::SerialPortNotOpenException
+   */
   void setBreak(bool level = true);
 
-  /*! Set the RTS handshaking line to the given level.  Defaults to true. */
+  /*! Set the RTS handshaking line to the given level.  Defaults to true.
+   *
+   * \throw serial::SerialIOException  TODO: actually thrown only by Unix
+   * \throw serial::SerialPortNotOpenException
+   */
   void setRTS(bool level = true);
 
-  /*! Set the DTR handshaking line to the given level.  Defaults to true. */
+  /*! Set the DTR handshaking line to the given level.  Defaults to true.
+   *
+   * \throw serial::SerialIOException  TODO: actually thrown only by Unix
+   * \throw serial::SerialPortNotOpenException
+   */
   void setDTR(bool level = true);
 
   /*!
@@ -568,20 +611,37 @@ class Serial {
    * \return Returns true if one of the lines changed, false if something else
    * occurred.
    *
-   * \throw SerialException
+   * \throw serial::SerialIOException  TODO: actually thrown only by Unix
+   * \throw serial::SerialPortNotOpenException  TODO: actually thrown only by Windows
    */
   bool waitForChange();
 
-  /*! Returns the current status of the CTS line. */
+  /*! Returns the current status of the CTS line.
+   *
+   * \throw serial::SerialIOException
+   * \throw serial::SerialPortNotOpenException
+   */
   bool getCTS();
 
-  /*! Returns the current status of the DSR line. */
+  /*! Returns the current status of the DSR line.
+   *
+   * \throw serial::SerialIOException
+   * \throw serial::SerialPortNotOpenException
+   */
   bool getDSR();
 
-  /*! Returns the current status of the RI line. */
+  /*! Returns the current status of the RI line.
+   *
+   * \throw serial::SerialIOException
+   * \throw serial::SerialPortNotOpenException
+   */
   bool getRI();
 
-  /*! Returns the current status of the CD line. */
+  /*! Returns the current status of the CD line.
+   *
+   * \throw serial::SerialIOException
+   * \throw serial::SerialPortNotOpenException
+   */
   bool getCD();
 
  private:
@@ -593,99 +653,27 @@ class Serial {
   size_t readline_(std::string &line, size_t size = 65536, const std::string &eol = "\n");  // core method which does not lock on mutex
 };
 
-class SerialException : public std::exception {
+class SerialException : public std::runtime_error {
  public:
-  explicit SerialException(const char *description) {
-    std::stringstream ss;
-    ss << "SerialException " << description << " failed.";
-    e_what_ = ss.str();
-  }
-
-  SerialException(const SerialException &other)
-      : e_what_(other.e_what_) {}
-
-  SerialException &operator=(const SerialException &) = delete;
-
-  ~SerialException() noexcept override = default;
-  const char *what() const noexcept override {
-    return e_what_.c_str();
-  }
-
- private:
-  std::string e_what_;
+  SerialException() : SerialException("generic fault") {}
+  explicit SerialException(const std::string &what_arg) : std::runtime_error("Serial Exception: " + what_arg + ".") {}
 };
 
-class IOException : public std::exception {
+class SerialInvalidArgumentException : public std::invalid_argument {
  public:
-  explicit IOException(std::string file, int line, int errnum)
-      : file_(file),
-        line_(line),
-        errno_(errnum) {
-    std::stringstream ss;
-#if defined(_WIN32) && !defined(__MINGW32__)
-    char error_str [1024];
-    strerror_s(error_str, 1024, errnum);
-#else
-    char *error_str = strerror(errnum);
-#endif
-    ss << "IO Exception (" << errno_ << "): " << error_str;
-    ss << ", file " << file_ << ", line " << line_ << ".";
-    e_what_ = ss.str();
-  }
-
-  explicit IOException(std::string file, int line, const char *description)
-      : file_(file),
-        line_(line),
-        errno_(0) {
-    std::stringstream ss;
-    ss << "IO Exception: " << description;
-    ss << ", file " << file_ << ", line " << line_ << ".";
-    e_what_ = ss.str();
-  }
-
-  IOException(const IOException &other)
-      : line_(other.line_),
-        e_what_(other.e_what_),
-        errno_(other.errno_) {}
-
-  IOException &operator=(const IOException &) = delete;
-
-  ~IOException() noexcept override = default;
-
-  int getErrorNumber() const { return errno_; }
-
-  const char *what() const noexcept override {
-    return e_what_.c_str();
-  }
-
- private:
-  std::string file_;
-  int line_;
-  std::string e_what_;
-  int errno_;
+  SerialInvalidArgumentException() : SerialInvalidArgumentException("generic fault") {}
+  explicit SerialInvalidArgumentException(const std::string &what_arg) : std::invalid_argument("Serial Invalid Argument Exception: " + what_arg + ".") {}
 };
 
-class PortNotOpenedException : public std::exception {
+class SerialIOException : public std::runtime_error {
  public:
-  explicit PortNotOpenedException(const char *description) {
-    std::stringstream ss;
-    ss << "PortNotOpenedException " << description << " failed.";
-    e_what_ = ss.str();
-  }
+  SerialIOException() : SerialIOException("generic fault") {}
+  explicit SerialIOException(const std::string &what_arg) : std::runtime_error("Serial IO Exception: " + what_arg + ", errno has been set to '" + std::to_string(errno) + "'.") {}
+};
 
-  PortNotOpenedException(const PortNotOpenedException &other)
-      : e_what_(other.e_what_) {}
-
-  PortNotOpenedException &operator=(PortNotOpenedException) = delete;
-
-  ~PortNotOpenedException() noexcept override = default;
-
-  const char *what() const noexcept override {
-    return e_what_.c_str();
-  }
-
- private:
-  std::string e_what_;
+class SerialPortNotOpenException : public std::runtime_error {
+ public:
+  SerialPortNotOpenException() : std::runtime_error("Serial Port Not Open Exception.") {}
 };
 
 /*!
