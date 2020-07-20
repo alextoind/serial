@@ -57,7 +57,7 @@ namespace serial {
 
 class Serial::SerialImpl {
  public:
-  SerialImpl(const std::string &port, unsigned long baudrate, bytesize_t bytesize, parity_t parity, stopbits_t stopbits,
+  SerialImpl(std::string port, unsigned long baudrate, bytesize_t bytesize, parity_t parity, stopbits_t stopbits,
              flowcontrol_t flowcontrol);
 
   virtual ~SerialImpl();
@@ -134,11 +134,10 @@ class Serial::SerialImpl {
   void reconfigurePort();
 
  private:
+  std::string port_;
 #if !defined(_WIN32)
-  std::string port_;               // Path to the file descriptor
-  int fd_;                    // The current file descriptor
+  int fd_;
 #else
-  std::wstring port_;               // Path to the file descriptor  //TODO: this should be a std::string and should be converted only during CreateFileW()
   HANDLE fd_;
 #endif
 

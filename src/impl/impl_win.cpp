@@ -33,9 +33,9 @@ inline std::wstring _prefix_port_if_needed(const std::wstring &input) {
   return input;
 }
 
-Serial::SerialImpl::SerialImpl(const std::string &port, unsigned long baudrate, bytesize_t bytesize, parity_t parity,
+Serial::SerialImpl::SerialImpl(std::string port, unsigned long baudrate, bytesize_t bytesize, parity_t parity,
                                stopbits_t stopbits, flowcontrol_t flowcontrol)
-    : port_(port.begin(), port.end()),
+    : port_(std::move(port)),
       fd_(INVALID_HANDLE_VALUE),
       is_open_(false),
       baudrate_(baudrate),
@@ -61,7 +61,7 @@ void Serial::SerialImpl::open() {
   }
 
   // See: https://github.com/wjwwood/serial/issues/84
-  std::wstring port_with_prefix = _prefix_port_if_needed(port_);
+  std::wstring port_with_prefix = _prefix_port_if_needed(std::wstring(port_.begin(), port_.end()));
   LPCWSTR lp_port = port_with_prefix.c_str();
   fd_ = CreateFileW(lp_port, GENERIC_READ | GENERIC_WRITE, 0, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr);
 
@@ -373,11 +373,11 @@ size_t Serial::SerialImpl::write(const uint8_t *data, size_t length) {
 }
 
 void Serial::SerialImpl::setPort(const std::string &port) {
-  port_ = std::wstring(port.begin(), port.end());
+  port_ = port;
 }
 
 std::string Serial::SerialImpl::getPort() const {
-  return std::string(port_.begin(), port_.end());
+  return port_;
 }
 
 void Serial::SerialImpl::setTimeout(Serial::Timeout &timeout) {

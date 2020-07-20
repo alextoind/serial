@@ -31,9 +31,9 @@ timespec getTimeSpec(std::chrono::duration<int64_t, T> duration) {
   return {duration_cast<seconds>(duration).count(), (duration_cast<nanoseconds>(duration) - duration_cast<seconds>(duration)).count()};
 }
 
-Serial::SerialImpl::SerialImpl(const std::string &port, unsigned long baudrate, bytesize_t bytesize, parity_t parity,
+Serial::SerialImpl::SerialImpl(std::string port, unsigned long baudrate, bytesize_t bytesize, parity_t parity,
                                stopbits_t stopbits, flowcontrol_t flowcontrol)
-    : port_(port),
+    : port_(std::move(port)),
       fd_(-1),
       is_open_(false),
       xonxoff_(false),
