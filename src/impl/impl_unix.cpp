@@ -732,124 +732,94 @@ void Serial::SerialImpl::flush() const {
   if (!is_open_) {
     throw SerialPortNotOpenException();
   }
-  tcflush(fd_, TCIOFLUSH);
+  if (::tcflush(fd_, TCIOFLUSH) == -1) {
+    throw SerialIOException("failure during ::tcflush()", errno);
+  }
 }
 
 void Serial::SerialImpl::flushInput() const {
   if (!is_open_) {
     throw SerialPortNotOpenException();
   }
-  tcflush(fd_, TCIFLUSH);
+  if (::tcflush(fd_, TCIFLUSH) == -1) {
+    throw SerialIOException("failure during ::tcflush()", errno);
+  }
 }
 
 void Serial::SerialImpl::flushOutput() const {
   if (!is_open_) {
     throw SerialPortNotOpenException();
   }
-  tcflush(fd_, TCOFLUSH);
+  if (::tcflush(fd_, TCOFLUSH) == -1) {
+    throw SerialIOException("failure during ::tcflush()", errno);
+  }
 }
 
-void Serial::SerialImpl::sendBreak(int duration) const {
+void Serial::SerialImpl::sendBreak(int duration_ms) const {
   if (!is_open_) {
     throw SerialPortNotOpenException();
   }
-  tcsendbreak(fd_, static_cast<int> (duration / 4));
+  if (::tcsendbreak(fd_, duration_ms) == -1) {
+    throw SerialIOException("failure during ::tcsendbreak()", errno);
+  }
 }
 
 void Serial::SerialImpl::setBreak(bool level) const {
+  setModemStatus(level ? TIOCSBRK : TIOCCBRK);
+}
+
+void Serial::SerialImpl::setModemStatus(uint32_t request, uint32_t command) const {
   if (!is_open_) {
     throw SerialPortNotOpenException();
   }
-  if (-1 == ioctl(fd_, level ? TIOCSBRK : TIOCCBRK)) {
-    throw (SerialIOException("setBreak() failed on a call to ioctl()"));
+  if (::ioctl(fd_, request, &command) == -1) {
+    throw SerialIOException("failure during ::ioctl()", errno);
   }
 }
 
 void Serial::SerialImpl::setRTS(bool level) const {
-  if (!is_open_) {
-    throw SerialPortNotOpenException();
-  }
-  int command = TIOCM_RTS;
-  if (-1 == ioctl(fd_, level ? TIOCMBIS : TIOCMBIC, &command)) {
-    throw (SerialIOException("setRTS() failed on a call to ioctl()"));
-  }
+  setModemStatus(level ? TIOCMBIS : TIOCMBIC, TIOCM_RTS);
 }
 
 void Serial::SerialImpl::setDTR(bool level) const {
+  setModemStatus(level ? TIOCMBIS : TIOCMBIC, TIOCM_DTR);
+}
+
+void Serial::SerialImpl::waitForModemChanges() const {
   if (!is_open_) {
     throw SerialPortNotOpenException();
   }
-  int command = TIOCM_DTR;
-  if (-1 == ioctl(fd_, level ? TIOCMBIS : TIOCMBIC, &command)) {
-    throw (SerialIOException("setDTR() failed on a call to ioctl()"));
+  // cannot use setModemStatus(): TIOCMIWAIT requires arg by value (not by pointer)
+  if (::ioctl(fd_, TIOCMIWAIT, TIOCM_CTS | TIOCM_DSR | TIOCM_RI | TIOCM_CD) == -1) {
+    throw SerialIOException("failure during ::ioctl()", errno);
   }
 }
 
-//TODO: check Windows implementation before fixes
-bool Serial::SerialImpl::waitForChange() const {
-#ifndef TIOCMIWAIT
-  while (is_open_ == true) {  //TODO: should throw like other methods if it is not open
-    int status;
-    if (-1 == ioctl(fd_, TIOCMGET, &status)) {
-      throw (SerialIOException("waitForChange() failed on a call to ioctl(TIOCMGET)"));
-    }
-    if ((status & TIOCM_CTS) != 0 || (status & TIOCM_DSR) != 0 || (status & TIOCM_RI) != 0 || (status & TIOCM_CD) != 0) {
-      return true;
-    }
-    //FIXME: possible infinite loop
-    std::this_thread::sleep_for(std::chrono::microseconds(1000));
+uint32_t Serial::SerialImpl::getModemStatus() const {
+  if (!is_open_) {
+    throw SerialPortNotOpenException();
   }
-  return false;  //FIXME: if TIOCMIWAIT is defined this never happens
-#else
-  if (-1 == ioctl(fd_, TIOCMIWAIT, TIOCM_CD | TIOCM_DSR | TIOCM_RI | TIOCM_CTS)) {
-    throw (SerialIOException("waitForChange() failed on a call to ioctl()"));
+  uint32_t modem_status;
+  if (::ioctl(fd_, TIOCMGET, &modem_status) == -1) {
+    throw SerialIOException("failure during ::ioctl()", errno);
   }
-  return true;
-#endif
+  return modem_status;
 }
 
 bool Serial::SerialImpl::getCTS() const {
-  if (!is_open_) {
-    throw SerialPortNotOpenException();
-  }
-  int status;
-  if (-1 == ioctl(fd_, TIOCMGET, &status)) {
-    throw (SerialIOException("getCTS() failed on a call to ioctl()"));
-  }
-  return (status & TIOCM_CTS) != 0;
+  return getModemStatus() & TIOCM_CTS;
 }
 
 bool Serial::SerialImpl::getDSR() const {
-  if (!is_open_) {
-    throw SerialPortNotOpenException();
-  }
-  int status;
-  if (-1 == ioctl(fd_, TIOCMGET, &status)) {
-    throw (SerialIOException("getDSR() failed on a call to ioctl()"));
-  }
-  return (status & TIOCM_DSR) != 0;
+  return getModemStatus() & TIOCM_DSR;
 }
 
 bool Serial::SerialImpl::getRI() const {
-  if (!is_open_) {
-    throw SerialPortNotOpenException();
-  }
-  int status;
-  if (-1 == ioctl(fd_, TIOCMGET, &status)) {
-    throw (SerialIOException("getRI() failed on a call to ioctl()"));
-  }
-  return (status & TIOCM_RI) != 0;
+  return getModemStatus() & TIOCM_RI;
 }
 
 bool Serial::SerialImpl::getCD() const {
-  if (!is_open_) {
-    throw SerialPortNotOpenException();
-  }
-  int status;
-  if (-1 == ioctl(fd_, TIOCMGET, &status)) {
-    throw (SerialIOException("getCD() failed on a call to ioctl()"));
-  }
-  return (status & TIOCM_CD) != 0;
+  return getModemStatus() & TIOCM_CD;
 }
 
 #endif  // !defined(_WIN32)

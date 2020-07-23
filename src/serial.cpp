@@ -239,8 +239,8 @@ void Serial::setDTR(bool level) {
   pimpl_->setDTR(level);
 }
 
-bool Serial::waitForChange() {
-  return pimpl_->waitForChange();
+void Serial::waitForModemChanges() {
+  pimpl_->waitForModemChanges();
 }
 
 bool Serial::getCTS() {

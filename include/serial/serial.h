@@ -614,7 +614,7 @@ class Serial {
    * \throw serial::SerialIOException  TODO: actually thrown only by Unix
    * \throw serial::SerialPortNotOpenException  TODO: actually thrown only by Windows
    */
-  bool waitForChange();
+  void waitForModemChanges();
 
   /*! Returns the current status of the CTS line.
    *
@@ -668,7 +668,8 @@ class SerialInvalidArgumentException : public std::invalid_argument {
 class SerialIOException : public std::runtime_error {
  public:
   SerialIOException() : SerialIOException("generic fault") {}
-  explicit SerialIOException(const std::string &what_arg) : std::runtime_error("Serial IO Exception: " + what_arg + ", errno has been set to '" + std::to_string(errno) + "'.") {}
+  explicit SerialIOException(const std::string &what_arg) : std::runtime_error("Serial IO Exception: " + what_arg + "'.") {}
+  explicit SerialIOException(const std::string &what_arg, uint32_t error) : std::runtime_error("Serial IO Exception: " + what_arg + ", error has been set to '" + std::to_string(error) + "'.") {}
 };
 
 class SerialPortNotOpenException : public std::runtime_error {

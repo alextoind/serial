@@ -450,103 +450,92 @@ void Serial::SerialImpl::flush() const {
   if (!is_open_) {
     throw SerialPortNotOpenException();
   }
-  PurgeComm(fd_, PURGE_RXCLEAR | PURGE_TXCLEAR);
+  if (!::PurgeComm(fd_, PURGE_RXCLEAR | PURGE_TXCLEAR)) {
+    throw SerialIOException("failure during ::EscapeCommFunction()");
+  }
 }
 
 void Serial::SerialImpl::flushInput() const {
   if (!is_open_) {
     throw SerialPortNotOpenException();
   }
-  PurgeComm(fd_, PURGE_RXCLEAR);
+  if (!::PurgeComm(fd_, PURGE_RXCLEAR)) {
+    throw SerialIOException("failure during ::EscapeCommFunction()");
+  }
 }
 
 void Serial::SerialImpl::flushOutput() const {
   if (!is_open_) {
     throw SerialPortNotOpenException();
   }
-  PurgeComm(fd_, PURGE_TXCLEAR);
+  if (!::PurgeComm(fd_, PURGE_TXCLEAR)) {
+    throw SerialIOException("failure during ::EscapeCommFunction()");
+  }
 }
 
-void Serial::SerialImpl::sendBreak(int /*duration*/) const {
+void Serial::SerialImpl::sendBreak(int duration_ms) const {
   throw SerialException("sendBreak() is not implemented on Windows");
 }
 
 void Serial::SerialImpl::setBreak(bool level) const {
+  setModemStatus(level ? SETBREAK : CLRBREAK);
+}
+
+void Serial::SerialImpl::setModemStatus(uint32_t request, uint32_t command) const {
   if (!is_open_) {
     throw SerialPortNotOpenException();
   }
-  EscapeCommFunction(fd_, level ? SETBREAK : CLRBREAK);
+  if (!::EscapeCommFunction(fd_, request)) {
+    throw SerialIOException("failure during ::EscapeCommFunction()");
+  }
 }
 
 void Serial::SerialImpl::setRTS(bool level) const {
-  if (!is_open_) {
-    throw SerialPortNotOpenException();
-  }
-  EscapeCommFunction(fd_, level ? SETRTS : CLRRTS);
+  setModemStatus(level ? SETRTS : CLRRTS);
 }
 
 void Serial::SerialImpl::setDTR(bool level) const {
-  if (!is_open_) {
-    throw SerialPortNotOpenException();
-  }
-  EscapeCommFunction(fd_, level ? SETDTR : CLRDTR);
+  setModemStatus(level ? SETDTR : CLRDTR);
 }
 
-bool Serial::SerialImpl::waitForChange() const {
+void Serial::SerialImpl::waitForModemChanges() const {
   if (!is_open_) {
     throw SerialPortNotOpenException();
   }
-  DWORD dwCommEvent;
-  if (!SetCommMask(fd_, EV_CTS | EV_DSR | EV_RING | EV_RLSD)) {
-    // Error setting communications mask
-    return false;
+  if (!::SetCommMask(fd_, EV_CTS | EV_DSR | EV_RING | EV_RLSD)) {
+    throw SerialIOException("failure during ::SetCommMask()");
   }
-  return WaitCommEvent(fd_, &dwCommEvent, nullptr) != 0;
+  DWORD event;
+  if (!::WaitCommEvent(fd_, &event, nullptr)) {
+    throw SerialIOException("failure during ::WaitCommEvent()");
+  }
+}
+
+uint32_t Serial::SerialImpl::getModemStatus() const {
+  if (!is_open_) {
+    throw SerialPortNotOpenException();
+  }
+  DWORD modem_status;
+  if (!::GetCommModemStatus(fd_, &modem_status)) {
+    throw SerialIOException("failure during ::GetCommModemStatus()");
+  }
+  return modem_status;
 }
 
 bool Serial::SerialImpl::getCTS() const {
-  if (!is_open_) {
-    throw SerialPortNotOpenException();
-  }
-  DWORD dwModemStatus;
-  if (!GetCommModemStatus(fd_, &dwModemStatus)) {
-    throw SerialIOException("getCTS() failed on a call to GetCommModemStatus()");
-  }
-
-  return (MS_CTS_ON & dwModemStatus) != 0;
+  return getModemStatus() & MS_CTS_ON;
 }
 
 bool Serial::SerialImpl::getDSR() const {
-  if (!is_open_) {
-    throw SerialPortNotOpenException();
-  }
-  DWORD dwModemStatus;
-  if (!GetCommModemStatus(fd_, &dwModemStatus)) {
-    throw SerialIOException("getDSR() failed on a call to GetCommModemStatus()");
-  }
-  return (MS_DSR_ON & dwModemStatus) != 0;
+  return getModemStatus() & MS_DSR_ON;
 }
 
 bool Serial::SerialImpl::getRI() const {
-  if (!is_open_) {
-    throw SerialPortNotOpenException();
-  }
-  DWORD dwModemStatus;
-  if (!GetCommModemStatus(fd_, &dwModemStatus)) {
-    throw SerialIOException("getRI() failed on a call to GetCommModemStatus()");
-  }
-  return (MS_RING_ON & dwModemStatus) != 0;
+  return getModemStatus() & MS_RING_ON;
 }
 
 bool Serial::SerialImpl::getCD() const {
-  if (!is_open_) {
-    throw SerialPortNotOpenException();
-  }
-  DWORD dwModemStatus;
-  if (!GetCommModemStatus(fd_, &dwModemStatus)) {
-    throw SerialIOException("getCD() failed on a call to GetCommModemStatus()");
-  }
-  return (MS_RLSD_ON & dwModemStatus) != 0;
+  return getModemStatus() & MS_RLSD_ON;
 }
 
 #endif  // defined(_WIN32)

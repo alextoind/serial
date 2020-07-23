@@ -84,15 +84,19 @@ class Serial::SerialImpl {
 
   void flushOutput() const;
 
-  void sendBreak(int duration) const;
+  void sendBreak(int duration_ms) const;
 
   void setBreak(bool level) const;
+
+  void setModemStatus(uint32_t request, uint32_t command = 0) const;
 
   void setRTS(bool level) const;
 
   void setDTR(bool level) const;
 
-  bool waitForChange() const;
+  void waitForModemChanges() const;
+
+  uint32_t getModemStatus() const;
 
   bool getCTS() const;
 
