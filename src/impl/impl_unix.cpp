@@ -786,6 +786,9 @@ void Serial::SerialImpl::setDTR(bool level) const {
 }
 
 void Serial::SerialImpl::waitForModemChanges() const {
+#ifndef TIOCMIWAIT
+  throw SerialException("TIOCMIWAIT is not defined");
+#else
   if (!is_open_) {
     throw SerialPortNotOpenException();
   }
@@ -793,6 +796,7 @@ void Serial::SerialImpl::waitForModemChanges() const {
   if (::ioctl(fd_, TIOCMIWAIT, TIOCM_CTS | TIOCM_DSR | TIOCM_RI | TIOCM_CD) == -1) {
     throw SerialIOException("failure during ::ioctl()", errno);
   }
+#endif
 }
 
 uint32_t Serial::SerialImpl::getModemStatus() const {
