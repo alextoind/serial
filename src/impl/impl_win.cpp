@@ -55,7 +55,7 @@ Serial::SerialImpl::~SerialImpl() {
 
 void Serial::SerialImpl::open() {
   if (port_.empty()) {
-    throw SerialInvalidArgumentException("empty port is invalid.");
+    throw SerialInvalidArgumentException("serial port is empty.");
   }
   if (is_open_) {
     throw SerialException("serial port already open.");  //TODO: actually there is no need to throw exception in this case
@@ -64,14 +64,9 @@ void Serial::SerialImpl::open() {
   // See: https://github.com/wjwwood/serial/issues/84
   std::wstring port_with_prefix = _prefix_port_if_needed(std::wstring(port_.begin(), port_.end()));
   LPCWSTR lp_port = port_with_prefix.c_str();
-  fd_ = CreateFileW(lp_port, GENERIC_READ | GENERIC_WRITE, 0, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr);
-
+  fd_ = ::CreateFileW(lp_port, GENERIC_READ | GENERIC_WRITE, 0, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr);
   if (fd_ == INVALID_HANDLE_VALUE) {
-    if (GetLastError() == ERROR_FILE_NOT_FOUND) {
-      throw SerialIOException("the specified port '" + getPort() + "' does not exist");
-    } else{
-      throw SerialIOException("error '" + std::to_string(GetLastError()) + "' while opening the serial port");
-    }
+    throw SerialIOException("failure during ::CreateFileW()", GetLastError());
   }
 
   reconfigurePort();
@@ -314,18 +309,11 @@ void Serial::SerialImpl::reconfigurePort() {
 }
 
 void Serial::SerialImpl::close() {
-  if (is_open_) {
-    if (fd_ != INVALID_HANDLE_VALUE) {
-      int ret;
-      ret = CloseHandle(fd_);
-      if (ret == 0) {
-        throw SerialIOException("error '" + std::to_string(GetLastError()) + "' while closing the serial port");
-      } else {
-        fd_ = INVALID_HANDLE_VALUE;
-      }
-    }
-    is_open_ = false;
+  if (is_open_ && fd_ != INVALID_HANDLE_VALUE && !::CloseHandle(fd_)) {
+    throw SerialIOException("failure during ::CloseHandle()", GetLastError());
   }
+  fd_ = INVALID_HANDLE_VALUE;
+  is_open_ = false;
 }
 
 bool Serial::SerialImpl::isOpen() const {
@@ -334,13 +322,13 @@ bool Serial::SerialImpl::isOpen() const {
 
 size_t Serial::SerialImpl::available() const {
   if (!is_open_) {
-    return 0;
+    throw SerialPortNotOpenException();
   }
-  COMSTAT cs;
-  if (!ClearCommError(fd_, nullptr, &cs)) {
-    throw SerialIOException("error '" + std::to_string(GetLastError()) + "' while checking status of the serial port");
+  COMSTAT stat;
+  if (!::ClearCommError(fd_, nullptr, &stat)) {
+    throw SerialIOException("during ::ClearCommError()", GetLastError());
   }
-  return static_cast<size_t>(cs.cbInQue);
+  return static_cast<size_t>(stat.cbInQue);
 }
 
 bool Serial::SerialImpl::waitReadable(std::chrono::milliseconds /*timeout*/) {

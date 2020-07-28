@@ -56,26 +56,19 @@ Serial::SerialImpl::~SerialImpl() {
 
 void Serial::SerialImpl::open() {
   if (port_.empty()) {
-    throw SerialInvalidArgumentException("empty port is invalid.");
+    throw SerialInvalidArgumentException("serial port is empty.");
   }
   if (is_open_) {
     throw SerialException("serial port already open.");  //TODO: actually there is no need to throw exception in this case
   }
 
   fd_ = ::open(port_.c_str(), O_RDWR | O_NOCTTY | O_NONBLOCK);
-
   if (fd_ == -1) {
-    switch (errno) {
-      case EINTR:
-        // Recurse because this is a recoverable error.
-        open();
-        return;
-      case ENFILE:
-      case EMFILE:
-        throw SerialIOException("too many file handles open.");
-      default:
-        throw SerialIOException();
+    if (errno == EINTR) {
+      open();  // Recurse because this is a recoverable error
+      return;
     }
+    throw SerialIOException("failure during ::open()", errno);
   }
 
   reconfigurePort();
@@ -455,18 +448,11 @@ void Serial::SerialImpl::reconfigurePort() {
 }
 
 void Serial::SerialImpl::close() {
-  if (is_open_) {
-    if (fd_ != -1) {
-      int ret;
-      ret = ::close(fd_);
-      if (ret == 0) {
-        fd_ = -1;
-      } else {
-        throw SerialIOException();
-      }
-    }
-    is_open_ = false;
+  if (is_open_ && fd_ != -1 && ::close(fd_) != 0) {
+    throw SerialIOException("failure during ::close()", errno);
   }
+  fd_ = -1;
+  is_open_ = false;
 }
 
 bool Serial::SerialImpl::isOpen() const {
@@ -475,14 +461,13 @@ bool Serial::SerialImpl::isOpen() const {
 
 size_t Serial::SerialImpl::available() const {
   if (!is_open_) {
-    return 0;
+    throw SerialPortNotOpenException();
   }
   int count = 0;
-  if (-1 == ioctl(fd_, TIOCINQ, &count)) {
-    throw SerialIOException();
-  } else {
-    return static_cast<size_t> (count);
+  if (::ioctl(fd_, TIOCINQ, &count) == -1) {
+    throw SerialIOException("failure during ::ioctl()", errno);
   }
+  return static_cast<size_t>(count);
 }
 
 bool Serial::SerialImpl::waitReadable(std::chrono::milliseconds timeout_ms) {
