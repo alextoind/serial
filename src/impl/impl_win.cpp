@@ -33,11 +33,12 @@ inline std::wstring _prefix_port_if_needed(const std::wstring &input) {
   return input;
 }
 
-Serial::SerialImpl::SerialImpl(std::string port, unsigned long baudrate, bytesize_t bytesize, parity_t parity,
-                               stopbits_t stopbits, flowcontrol_t flowcontrol)
+Serial::SerialImpl::SerialImpl(std::string port, unsigned long baudrate, Timeout timeout, bytesize_t bytesize,
+                               parity_t parity, stopbits_t stopbits, flowcontrol_t flowcontrol)
     : port_(std::move(port)),
       fd_(INVALID_HANDLE_VALUE),
       is_open_(false),
+      timeout_(timeout),
       baudrate_(baudrate),
       parity_(parity),
       bytesize_(bytesize),

@@ -57,8 +57,8 @@ namespace serial {
 
 class Serial::SerialImpl {
  public:
-  SerialImpl(std::string port, unsigned long baudrate, bytesize_t bytesize, parity_t parity, stopbits_t stopbits,
-             flowcontrol_t flowcontrol);
+  SerialImpl(std::string port, unsigned long baudrate, Timeout timeout, bytesize_t bytesize, parity_t parity,
+             stopbits_t stopbits, flowcontrol_t flowcontrol);
 
   virtual ~SerialImpl();
 

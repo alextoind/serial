@@ -31,13 +31,15 @@ timespec getTimeSpec(std::chrono::duration<int64_t, T> duration) {
   return {duration_cast<seconds>(duration).count(), (duration_cast<nanoseconds>(duration) - duration_cast<seconds>(duration)).count()};
 }
 
-Serial::SerialImpl::SerialImpl(std::string port, unsigned long baudrate, bytesize_t bytesize, parity_t parity,
-                               stopbits_t stopbits, flowcontrol_t flowcontrol)
+Serial::SerialImpl::SerialImpl(std::string port, unsigned long baudrate, Timeout timeout, bytesize_t bytesize,
+                               parity_t parity, stopbits_t stopbits, flowcontrol_t flowcontrol)
     : port_(std::move(port)),
       fd_(-1),
+      byte_time_ns_(0),
       is_open_(false),
       xonxoff_(false),
       rtscts_(false),
+      timeout_(timeout),
       baudrate_(baudrate),
       parity_(parity),
       bytesize_(bytesize),
@@ -666,7 +668,7 @@ std::string Serial::SerialImpl::getPort() const {
 }
 
 void Serial::SerialImpl::setTimeout(Serial::Timeout &timeout) {
-  timeout_ = timeout;
+  timeout_ = timeout;  // timeout is used directly inside read() and write(): there is no need to call reconfigurePort()
 }
 
 Serial::Timeout Serial::SerialImpl::getTimeout() const {
