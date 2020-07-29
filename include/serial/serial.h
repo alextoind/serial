@@ -211,6 +211,8 @@ class Serial {
    */
   bool waitReadable();
 
+  bool waitWritable();
+
   /*! Block for a period of time corresponding to the transmission time of
    * count characters at present serial settings. This may be used in con-
    * junction with waitReadable to read larger blocks of data from the

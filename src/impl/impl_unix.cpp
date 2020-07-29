@@ -35,7 +35,6 @@ Serial::SerialImpl::SerialImpl(std::string port, unsigned long baudrate, Timeout
                                parity_t parity, stopbits_t stopbits, flowcontrol_t flowcontrol)
     : port_(std::move(port)),
       fd_(-1),
-      byte_time_ns_(0),
       is_open_(false),
       xonxoff_(false),
       rtscts_(false),
@@ -435,16 +434,6 @@ void Serial::SerialImpl::reconfigurePort() {
 
   // activate settings
   ::tcsetattr(fd_, TCSANOW, &options);
-
-  // Update byte_time_ based on the new settings.
-  uint32_t bit_time_ns = 1e9 / baudrate_;
-  byte_time_ns_ = bit_time_ns * (1 + bytesize_ + parity_ + stopbits_);
-
-  // Compensate for the stopbits_one_point_five enum being equal to int 3,
-  // and not 1.5.
-  if (stopbits_ == stopbits_one_point_five) {
-    byte_time_ns_ += ((1.5 - stopbits_one_point_five) * bit_time_ns);
-  }
 }
 
 void Serial::SerialImpl::close() {
@@ -470,37 +459,32 @@ size_t Serial::SerialImpl::available() const {
   return static_cast<size_t>(count);
 }
 
-bool Serial::SerialImpl::waitReadable(std::chrono::milliseconds timeout_ms) {
-  // Setup a select call to block for serial data or a timeout
-  fd_set readfds;
-  FD_ZERO (&readfds);
-  FD_SET (fd_, &readfds);
+bool waitOnPoll(std::chrono::milliseconds timeout_ms, std::unique_ptr<pollfd> fds) {
   timespec timeout = getTimeSpec(timeout_ms);
-  int r = pselect(fd_ + 1, &readfds, nullptr, nullptr, &timeout, nullptr);
+  int r = ppoll(fds.get(), 1, &timeout, nullptr);
+  if (r < 0 && errno != EINTR) {
+    throw SerialIOException("failure during ::ppoll()", errno);
+  }
+  if (fds->revents == POLLERR || fds->revents == POLLHUP || fds->revents == POLLNVAL) {
+    throw SerialIOException("failure during ::ppoll(), revents has been set to '" + std::to_string(fds->revents) + "'.");
+  }
+  return r > 0;
+}
 
-  if (r < 0) {
-    // Select was interrupted
-    if (errno == EINTR) {
-      return false;
-    }
-    // Otherwise there was some error
-    throw SerialIOException();
-  }
-  // Timeout occurred
-  if (r == 0) {
-    return false;
-  }
-  // This shouldn't happen, if r > 0 our fd has to be in the list!
-  if (!FD_ISSET (fd_, &readfds)) {
-    throw SerialIOException("select reports ready to read, but our fd isn't in the list, this shouldn't happen!");
-  }
-  // Data available to read.
-  return true;
+bool Serial::SerialImpl::waitReadable(std::chrono::milliseconds timeout_ms) const {
+  return waitOnPoll(timeout_ms, std::unique_ptr<pollfd>(new pollfd{fd_, POLLIN, 0}));
+}
+
+bool Serial::SerialImpl::waitWritable(std::chrono::milliseconds timeout_ms) const {
+  return waitOnPoll(timeout_ms, std::unique_ptr<pollfd>(new pollfd{fd_, POLLOUT, 0}));
 }
 
 void Serial::SerialImpl::waitByteTimes(size_t count) const {
-  timespec wait_time = {0, static_cast<long>(byte_time_ns_ * count)};
-  pselect(0, nullptr, nullptr, nullptr, &wait_time, nullptr);
+  auto start = std::chrono::steady_clock::now();
+  uint32_t bit_time_ns = 1e9 / baudrate_;
+  uint32_t byte_time_ns = bit_time_ns * (1 + bytesize_ + parity_ + stopbits_);
+  byte_time_ns += stopbits_ == stopbits_one_point_five ? -1.5*bit_time_ns : 0;  // stopbits_one_point_five is 3
+  std::this_thread::sleep_until(start + std::chrono::nanoseconds(byte_time_ns * count));
 }
 
 size_t Serial::SerialImpl::read(uint8_t *buf, size_t size) {

@@ -23,6 +23,7 @@
 #define SERIAL_IMPL_H
 
 #include <serial/serial.h>
+#include <thread>
 
 #if defined(_WIN32)
 #include <windows.h>
@@ -31,7 +32,7 @@
 #include <sys/ioctl.h>
 #include <termios.h>
 #include <unistd.h>
-#include <thread>
+#include <poll.h>
 
 #if defined(__linux__)
 #include <linux/serial.h>
@@ -70,7 +71,9 @@ class Serial::SerialImpl {
 
   size_t available() const;
 
-  bool waitReadable(std::chrono::milliseconds timeout_ms);
+  bool waitReadable(std::chrono::milliseconds timeout_ms) const;
+
+  bool waitWritable(std::chrono::milliseconds timeout_ms) const;
 
   void waitByteTimes(size_t count) const;
 
@@ -153,10 +156,6 @@ class Serial::SerialImpl {
 
   Timeout timeout_;           // Timeout for read operations
   unsigned long baudrate_;    // Baudrate
-#if !defined(_WIN32)
-  uint32_t byte_time_ns_;     // Nanoseconds to transmit/receive a single byte
-#endif
-
   parity_t parity_;           // Parity
   bytesize_t bytesize_;       // Size of the bytes
   stopbits_t stopbits_;       // Stop Bits

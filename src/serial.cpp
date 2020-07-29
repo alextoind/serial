@@ -54,6 +54,10 @@ bool Serial::waitReadable() {
   return pimpl_->waitReadable(pimpl_->getTimeout().getReadConstant());
 }
 
+bool Serial::waitWritable() {
+  return pimpl_->waitWritable(pimpl_->getTimeout().getWriteConstant());
+}
+
 void Serial::waitByteTimes(size_t count) {
   pimpl_->waitByteTimes(count);
 }

@@ -331,12 +331,22 @@ size_t Serial::SerialImpl::available() const {
   return static_cast<size_t>(stat.cbInQue);
 }
 
-bool Serial::SerialImpl::waitReadable(std::chrono::milliseconds /*timeout*/) {
+bool Serial::SerialImpl::waitReadable(std::chrono::milliseconds timeout_ms) const {
   throw SerialException("waitReadable() is not implemented on Windows");
+  //TODO: have a deeper look at WaitForSingleObject
 }
 
-void Serial::SerialImpl::waitByteTimes(size_t /*count*/) const {
-  throw SerialException("waitByteTimes() is not implemented on Windows");
+bool Serial::SerialImpl::waitWritable(std::chrono::milliseconds timeout_ms) const {
+  throw SerialException("waitWritable() is not implemented on Windows");
+  //TODO: have a deeper look at WaitForSingleObject
+}
+
+void Serial::SerialImpl::waitByteTimes(size_t count) const {
+  auto start = std::chrono::steady_clock::now();
+  uint32_t bit_time_ns = 1e9 / baudrate_;
+  uint32_t byte_time_ns = bit_time_ns * (1 + bytesize_ + parity_ + stopbits_);
+  byte_time_ns += stopbits_ == stopbits_one_point_five ? -1.5*bit_time_ns : 0;  // stopbits_one_point_five is 3
+  std::this_thread::sleep_until(start + std::chrono::nanoseconds(byte_time_ns * count));
 }
 
 size_t Serial::SerialImpl::read(uint8_t *buf, size_t size) {
