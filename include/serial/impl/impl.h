@@ -23,6 +23,7 @@
 #define SERIAL_IMPL_H
 
 #include <serial/serial.h>
+#include <thread>
 
 #if defined(_WIN32)
 #include <windows.h>
@@ -31,7 +32,7 @@
 #include <sys/ioctl.h>
 #include <termios.h>
 #include <unistd.h>
-#include <thread>
+#include <poll.h>
 
 #if defined(__linux__)
 #include <linux/serial.h>
@@ -57,8 +58,8 @@ namespace serial {
 
 class Serial::SerialImpl {
  public:
-  SerialImpl(const std::string &port, unsigned long baudrate, bytesize_t bytesize, parity_t parity, stopbits_t stopbits,
-             flowcontrol_t flowcontrol);
+  SerialImpl(std::string port, unsigned long baudrate, Timeout timeout, bytesize_t bytesize, parity_t parity,
+             stopbits_t stopbits, flowcontrol_t flowcontrol);
 
   virtual ~SerialImpl();
 
@@ -70,13 +71,15 @@ class Serial::SerialImpl {
 
   size_t available() const;
 
-  bool waitReadable(std::chrono::milliseconds timeout_ms);
+  bool waitReadable(std::chrono::milliseconds timeout_ms) const;
+
+  bool waitWritable(std::chrono::milliseconds timeout_ms) const;
 
   void waitByteTimes(size_t count) const;
 
   size_t read(uint8_t *buf, size_t size = 1);
 
-  size_t write(const uint8_t *data, size_t length);
+  size_t write(const uint8_t *data, size_t size);
 
   void flush() const;
 
@@ -84,15 +87,19 @@ class Serial::SerialImpl {
 
   void flushOutput() const;
 
-  void sendBreak(int duration) const;
+  void sendBreak(int duration_ms) const;
 
   void setBreak(bool level) const;
+
+  void setModemStatus(uint32_t request, uint32_t command = 0) const;
 
   void setRTS(bool level) const;
 
   void setDTR(bool level) const;
 
-  bool waitForChange() const;
+  void waitForModemChanges() const;
+
+  uint32_t getModemStatus() const;
 
   bool getCTS() const;
 
@@ -134,11 +141,10 @@ class Serial::SerialImpl {
   void reconfigurePort();
 
  private:
+  std::string port_;
 #if !defined(_WIN32)
-  std::string port_;               // Path to the file descriptor
-  int fd_;                    // The current file descriptor
+  int fd_;
 #else
-  std::wstring port_;               // Path to the file descriptor  //TODO: this should be a std::string and should be converted only during CreateFileW()
   HANDLE fd_;
 #endif
 
@@ -150,10 +156,6 @@ class Serial::SerialImpl {
 
   Timeout timeout_;           // Timeout for read operations
   unsigned long baudrate_;    // Baudrate
-#if !defined(_WIN32)
-  uint32_t byte_time_ns_;     // Nanoseconds to transmit/receive a single byte
-#endif
-
   parity_t parity_;           // Parity
   bytesize_t bytesize_;       // Size of the bytes
   stopbits_t stopbits_;       // Stop Bits

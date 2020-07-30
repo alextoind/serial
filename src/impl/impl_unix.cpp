@@ -25,19 +25,21 @@
 
 using namespace serial;
 
+//TODO: remove if no longer used (it was used by pselect and ppoll)
 template<typename T>
 timespec getTimeSpec(std::chrono::duration<int64_t, T> duration) {
   using namespace std::chrono;
   return {duration_cast<seconds>(duration).count(), (duration_cast<nanoseconds>(duration) - duration_cast<seconds>(duration)).count()};
 }
 
-Serial::SerialImpl::SerialImpl(const std::string &port, unsigned long baudrate, bytesize_t bytesize, parity_t parity,
-                               stopbits_t stopbits, flowcontrol_t flowcontrol)
-    : port_(port),
+Serial::SerialImpl::SerialImpl(std::string port, unsigned long baudrate, Timeout timeout, bytesize_t bytesize,
+                               parity_t parity, stopbits_t stopbits, flowcontrol_t flowcontrol)
+    : port_(std::move(port)),
       fd_(-1),
       is_open_(false),
       xonxoff_(false),
       rtscts_(false),
+      timeout_(timeout),
       baudrate_(baudrate),
       parity_(parity),
       bytesize_(bytesize),
@@ -54,26 +56,19 @@ Serial::SerialImpl::~SerialImpl() {
 
 void Serial::SerialImpl::open() {
   if (port_.empty()) {
-    throw SerialInvalidArgumentException("empty port is invalid.");
+    throw SerialInvalidArgumentException("serial port is empty.");
   }
   if (is_open_) {
     throw SerialException("serial port already open.");  //TODO: actually there is no need to throw exception in this case
   }
 
   fd_ = ::open(port_.c_str(), O_RDWR | O_NOCTTY | O_NONBLOCK);
-
   if (fd_ == -1) {
-    switch (errno) {
-      case EINTR:
-        // Recurse because this is a recoverable error.
-        open();
-        return;
-      case ENFILE:
-      case EMFILE:
-        throw SerialIOException("too many file handles open.");
-      default:
-        throw SerialIOException();
+    if (errno == EINTR) {
+      open();  // Recurse because this is a recoverable error
+      return;
     }
+    throw SerialIOException("failure during ::open()", errno);
   }
 
   reconfigurePort();
@@ -440,31 +435,14 @@ void Serial::SerialImpl::reconfigurePort() {
 
   // activate settings
   ::tcsetattr(fd_, TCSANOW, &options);
-
-  // Update byte_time_ based on the new settings.
-  uint32_t bit_time_ns = 1e9 / baudrate_;
-  byte_time_ns_ = bit_time_ns * (1 + bytesize_ + parity_ + stopbits_);
-
-  // Compensate for the stopbits_one_point_five enum being equal to int 3,
-  // and not 1.5.
-  if (stopbits_ == stopbits_one_point_five) {
-    byte_time_ns_ += ((1.5 - stopbits_one_point_five) * bit_time_ns);
-  }
 }
 
 void Serial::SerialImpl::close() {
-  if (is_open_) {
-    if (fd_ != -1) {
-      int ret;
-      ret = ::close(fd_);
-      if (ret == 0) {
-        fd_ = -1;
-      } else {
-        throw SerialIOException();
-      }
-    }
-    is_open_ = false;
+  if (is_open_ && fd_ != -1 && ::close(fd_) != 0) {
+    throw SerialIOException("failure during ::close()", errno);
   }
+  fd_ = -1;
+  is_open_ = false;
 }
 
 bool Serial::SerialImpl::isOpen() const {
@@ -473,188 +451,96 @@ bool Serial::SerialImpl::isOpen() const {
 
 size_t Serial::SerialImpl::available() const {
   if (!is_open_) {
-    return 0;
+    throw SerialPortNotOpenException();
   }
   int count = 0;
-  if (-1 == ioctl(fd_, TIOCINQ, &count)) {
-    throw SerialIOException();
-  } else {
-    return static_cast<size_t> (count);
+  if (::ioctl(fd_, TIOCINQ, &count) == -1) {
+    throw SerialIOException("failure during ::ioctl()", errno);
   }
+  return static_cast<size_t>(count);
 }
 
-bool Serial::SerialImpl::waitReadable(std::chrono::milliseconds timeout_ms) {
-  // Setup a select call to block for serial data or a timeout
-  fd_set readfds;
-  FD_ZERO (&readfds);
-  FD_SET (fd_, &readfds);
-  timespec timeout = getTimeSpec(timeout_ms);
-  int r = pselect(fd_ + 1, &readfds, nullptr, nullptr, &timeout, nullptr);
+bool waitOnPoll(std::chrono::milliseconds timeout_ms, std::unique_ptr<pollfd> fds) {
+  int r = ::poll(fds.get(), 1, timeout_ms.count());
+  if (r < 0 && errno != EINTR) {
+    throw SerialIOException("failure during ::poll()", errno);
+  }
+  if (fds->revents == POLLERR || fds->revents == POLLHUP || fds->revents == POLLNVAL) {
+    throw SerialIOException("failure during ::poll(), revents has been set to '" + std::to_string(fds->revents) + "'.");
+  }
+  return r > 0;
+}
 
-  if (r < 0) {
-    // Select was interrupted
-    if (errno == EINTR) {
-      return false;
-    }
-    // Otherwise there was some error
-    throw SerialIOException();
-  }
-  // Timeout occurred
-  if (r == 0) {
-    return false;
-  }
-  // This shouldn't happen, if r > 0 our fd has to be in the list!
-  if (!FD_ISSET (fd_, &readfds)) {
-    throw SerialIOException("select reports ready to read, but our fd isn't in the list, this shouldn't happen!");
-  }
-  // Data available to read.
-  return true;
+bool Serial::SerialImpl::waitReadable(std::chrono::milliseconds timeout_ms) const {
+  return waitOnPoll(timeout_ms, std::unique_ptr<pollfd>(new pollfd{fd_, POLLIN, 0}));
+}
+
+bool Serial::SerialImpl::waitWritable(std::chrono::milliseconds timeout_ms) const {
+  return waitOnPoll(timeout_ms, std::unique_ptr<pollfd>(new pollfd{fd_, POLLOUT, 0}));
 }
 
 void Serial::SerialImpl::waitByteTimes(size_t count) const {
-  timespec wait_time = {0, static_cast<long>(byte_time_ns_ * count)};
-  pselect(0, nullptr, nullptr, nullptr, &wait_time, nullptr);
+  auto start = std::chrono::steady_clock::now();
+  uint32_t bit_time_ns = 1e9 / baudrate_;
+  uint32_t byte_time_ns = bit_time_ns * (1 + bytesize_ + parity_ + stopbits_);
+  byte_time_ns += stopbits_ == stopbits_one_point_five ? -1.5*bit_time_ns : 0;  // stopbits_one_point_five is 3
+  std::this_thread::sleep_until(start + std::chrono::nanoseconds(byte_time_ns * count));
 }
 
 size_t Serial::SerialImpl::read(uint8_t *buf, size_t size) {
-  // If the port is not open, throw
   if (!is_open_) {
     throw SerialPortNotOpenException();
   }
-  size_t bytes_read = 0;
-
   auto read_deadline = timeout_.getReadDeadline(size);
-
-  // Pre-fill buffer with available bytes
-  {
-    ssize_t bytes_read_now = ::read(fd_, buf, size);
-    if (bytes_read_now > 0) {
-      bytes_read = bytes_read_now;
-    }
+  size_t total_bytes_read = ::read(fd_, buf, size);
+  if (total_bytes_read == -1) {
+    throw SerialIOException("failure during ::read()", errno);
   }
-
-  while (bytes_read < size) {
+  while (total_bytes_read < size) {
     auto remaining_time = Timeout::remainingMilliseconds(read_deadline);
     if (remaining_time.count() <= 0) {
-      // Timed out
       break;
     }
-    // Timeout for the next select is whichever is less of the remaining
-    // total read timeout and the inter-byte timeout.
-    // Wait for the device to be readable, and then attempt to read.
     if (waitReadable(std::min(remaining_time, timeout_.getInterByte()))) {
-      // If it's a fixed-length multi-byte read, insert a wait here so that
-      // we can attempt to grab the whole thing in a single IO call. Skip
-      // this wait if a non-max inter_byte_timeout is specified.
-      if (size > 1 && timeout_.getInterByteMilliseconds() == std::numeric_limits<uint32_t>::max()) {
+      if (size - total_bytes_read > 1 && timeout_.getInterByteMilliseconds() == std::numeric_limits<uint32_t>::max()) {
         size_t bytes_available = available();
-        if (bytes_available + bytes_read < size) {
-          waitByteTimes(size - (bytes_available + bytes_read));
+        if (bytes_available + total_bytes_read < size) {
+          waitByteTimes(size - (bytes_available + total_bytes_read));
         }
       }
-      // This should be non-blocking returning only what is available now
-      //  Then returning so that select can block again.
-      ssize_t bytes_read_now = ::read(fd_, buf + bytes_read, size - bytes_read);
-      // read should always return some data as select reported it was
-      // ready to read when we get to this point.
-      if (bytes_read_now < 1) {
-        // Disconnected devices, at least on Linux, show the
-        // behavior that they are always ready to read immediately
-        // but reading returns nothing.
-        throw SerialException("device reports readiness to read but returned no data (device disconnected?)");
+      size_t bytes_read = ::read(fd_, buf + total_bytes_read, size - total_bytes_read);
+      if (bytes_read < 1) {  // at least one byte is for sure available
+        throw SerialIOException("failure during ::read()", errno);
       }
-      // Update bytes_read
-      bytes_read += static_cast<size_t> (bytes_read_now);
-      // If bytes_read == size then we have read everything we need
-      if (bytes_read == size) {
-        break;
-      }
-      // If bytes_read < size then we have more to read
-      if (bytes_read < size) {
-        continue;
-      }
-      // If bytes_read > size then we have over read, which shouldn't happen
-      if (bytes_read > size) {
-        throw SerialException("read over read, too many bytes where read, this shouldn't happen, might be a logical error!");
-      }
+      total_bytes_read += bytes_read;
     }
   }
-  return bytes_read;
+  return total_bytes_read;
 }
 
-size_t Serial::SerialImpl::write(const uint8_t *data, size_t length) {
+size_t Serial::SerialImpl::write(const uint8_t *data, size_t size) {
   if (!is_open_) {
     throw SerialPortNotOpenException();
   }
-  fd_set writefds;
-  size_t bytes_written = 0;
-
-  auto write_deadline = timeout_.getWriteDeadline(length);
-
-  bool first_iteration = true;
-  while (bytes_written < length) {
+  auto write_deadline = timeout_.getWriteDeadline(size);
+  size_t total_bytes_written = ::write(fd_, data, size);
+  if (total_bytes_written == -1) {
+    throw SerialIOException("failure during ::write()", errno);
+  }
+  while (total_bytes_written < size) {
     auto remaining_time = Timeout::remainingMilliseconds(write_deadline);
-    // Only consider the timeout if it's not the first iteration of the loop
-    // otherwise a timeout of 0 won't be allowed through
-    if (!first_iteration && (remaining_time.count() <= 0)) {
-      // Timed out
+    if (remaining_time.count() <= 0) {
       break;
     }
-    first_iteration = false;
-
-    FD_ZERO (&writefds);
-    FD_SET (fd_, &writefds);
-    timespec timeout = getTimeSpec(remaining_time);
-    int r = pselect(fd_ + 1, nullptr, &writefds, nullptr, &timeout, nullptr);
-
-    // Figure out what happened by looking at select's response 'r'
-    /** Error **/
-    if (r < 0) {
-      // Select was interrupted, try again
-      if (errno == EINTR) {
-        continue;
+    if (waitWritable(remaining_time)) {
+      size_t bytes_written = ::write(fd_, data + total_bytes_written, size - total_bytes_written);
+      if (bytes_written < 1) {  // at least one byte is for sure available
+        throw SerialIOException("failure during ::write()", errno);
       }
-      // Otherwise there was some error
-      throw SerialIOException();
-    }
-    /** Timeout **/
-    if (r == 0) {
-      break;
-    }
-    /** Port ready to write **/
-    if (r > 0) {
-      // Make sure our file descriptor is in the ready to write list
-      if (FD_ISSET (fd_, &writefds)) {
-        // This will write some
-        ssize_t bytes_written_now = ::write(fd_, data + bytes_written, length - bytes_written);
-        // write should always return some data as select reported it was
-        // ready to write when we get to this point.
-        if (bytes_written_now < 1) {
-          // Disconnected devices, at least on Linux, show the
-          // behavior that they are always ready to write immediately
-          // but writing returns nothing.
-          throw SerialException("device reports readiness to write but returned no data (device disconnected?)");
-        }
-        // Update bytes_written
-        bytes_written += static_cast<size_t> (bytes_written_now);
-        // If bytes_written == size then we have written everything we need to
-        if (bytes_written == length) {
-          break;
-        }
-        // If bytes_written < size then we have more to write
-        if (bytes_written < length) {
-          continue;
-        }
-        // If bytes_written > size then we have over written, which shouldn't happen
-        if (bytes_written > length) {
-          throw SerialException("write over wrote, too many bytes where written, this shouldn't happen, might be a logical error!");
-        }
-      }
-      // This shouldn't happen, if r > 0 our fd has to be in the list!
-      throw SerialIOException("select reports ready to write, but our fd isn't in the list, this shouldn't happen!");
+      total_bytes_written += bytes_written;
     }
   }
-  return bytes_written;
+  return total_bytes_written;
 }
 
 void Serial::SerialImpl::setPort(const std::string &port) {
@@ -666,7 +552,7 @@ std::string Serial::SerialImpl::getPort() const {
 }
 
 void Serial::SerialImpl::setTimeout(Serial::Timeout &timeout) {
-  timeout_ = timeout;
+  timeout_ = timeout;  // timeout is used directly inside read() and write(): there is no need to call reconfigurePort()
 }
 
 Serial::Timeout Serial::SerialImpl::getTimeout() const {
@@ -732,124 +618,98 @@ void Serial::SerialImpl::flush() const {
   if (!is_open_) {
     throw SerialPortNotOpenException();
   }
-  tcflush(fd_, TCIOFLUSH);
+  if (::tcflush(fd_, TCIOFLUSH) == -1) {
+    throw SerialIOException("failure during ::tcflush()", errno);
+  }
 }
 
 void Serial::SerialImpl::flushInput() const {
   if (!is_open_) {
     throw SerialPortNotOpenException();
   }
-  tcflush(fd_, TCIFLUSH);
+  if (::tcflush(fd_, TCIFLUSH) == -1) {
+    throw SerialIOException("failure during ::tcflush()", errno);
+  }
 }
 
 void Serial::SerialImpl::flushOutput() const {
   if (!is_open_) {
     throw SerialPortNotOpenException();
   }
-  tcflush(fd_, TCOFLUSH);
+  if (::tcflush(fd_, TCOFLUSH) == -1) {
+    throw SerialIOException("failure during ::tcflush()", errno);
+  }
 }
 
-void Serial::SerialImpl::sendBreak(int duration) const {
+void Serial::SerialImpl::sendBreak(int duration_ms) const {
   if (!is_open_) {
     throw SerialPortNotOpenException();
   }
-  tcsendbreak(fd_, static_cast<int> (duration / 4));
+  if (::tcsendbreak(fd_, duration_ms) == -1) {
+    throw SerialIOException("failure during ::tcsendbreak()", errno);
+  }
 }
 
 void Serial::SerialImpl::setBreak(bool level) const {
+  setModemStatus(level ? TIOCSBRK : TIOCCBRK);
+}
+
+void Serial::SerialImpl::setModemStatus(uint32_t request, uint32_t command) const {
   if (!is_open_) {
     throw SerialPortNotOpenException();
   }
-  if (-1 == ioctl(fd_, level ? TIOCSBRK : TIOCCBRK)) {
-    throw (SerialIOException("setBreak() failed on a call to ioctl()"));
+  if (::ioctl(fd_, request, &command) == -1) {
+    throw SerialIOException("failure during ::ioctl()", errno);
   }
 }
 
 void Serial::SerialImpl::setRTS(bool level) const {
-  if (!is_open_) {
-    throw SerialPortNotOpenException();
-  }
-  int command = TIOCM_RTS;
-  if (-1 == ioctl(fd_, level ? TIOCMBIS : TIOCMBIC, &command)) {
-    throw (SerialIOException("setRTS() failed on a call to ioctl()"));
-  }
+  setModemStatus(level ? TIOCMBIS : TIOCMBIC, TIOCM_RTS);
 }
 
 void Serial::SerialImpl::setDTR(bool level) const {
+  setModemStatus(level ? TIOCMBIS : TIOCMBIC, TIOCM_DTR);
+}
+
+void Serial::SerialImpl::waitForModemChanges() const {
+#ifndef TIOCMIWAIT
+  throw SerialException("TIOCMIWAIT is not defined");
+#else
   if (!is_open_) {
     throw SerialPortNotOpenException();
   }
-  int command = TIOCM_DTR;
-  if (-1 == ioctl(fd_, level ? TIOCMBIS : TIOCMBIC, &command)) {
-    throw (SerialIOException("setDTR() failed on a call to ioctl()"));
+  // cannot use setModemStatus(): TIOCMIWAIT requires arg by value (not by pointer)
+  if (::ioctl(fd_, TIOCMIWAIT, TIOCM_CTS | TIOCM_DSR | TIOCM_RI | TIOCM_CD) == -1) {
+    throw SerialIOException("failure during ::ioctl()", errno);
   }
-}
-
-//TODO: check Windows implementation before fixes
-bool Serial::SerialImpl::waitForChange() const {
-#ifndef TIOCMIWAIT
-  while (is_open_ == true) {  //TODO: should throw like other methods if it is not open
-    int status;
-    if (-1 == ioctl(fd_, TIOCMGET, &status)) {
-      throw (SerialIOException("waitForChange() failed on a call to ioctl(TIOCMGET)"));
-    }
-    if ((status & TIOCM_CTS) != 0 || (status & TIOCM_DSR) != 0 || (status & TIOCM_RI) != 0 || (status & TIOCM_CD) != 0) {
-      return true;
-    }
-    //FIXME: possible infinite loop
-    std::this_thread::sleep_for(std::chrono::microseconds(1000));
-  }
-  return false;  //FIXME: if TIOCMIWAIT is defined this never happens
-#else
-  if (-1 == ioctl(fd_, TIOCMIWAIT, TIOCM_CD | TIOCM_DSR | TIOCM_RI | TIOCM_CTS)) {
-    throw (SerialIOException("waitForChange() failed on a call to ioctl()"));
-  }
-  return true;
 #endif
 }
 
-bool Serial::SerialImpl::getCTS() const {
+uint32_t Serial::SerialImpl::getModemStatus() const {
   if (!is_open_) {
     throw SerialPortNotOpenException();
   }
-  int status;
-  if (-1 == ioctl(fd_, TIOCMGET, &status)) {
-    throw (SerialIOException("getCTS() failed on a call to ioctl()"));
+  uint32_t modem_status;
+  if (::ioctl(fd_, TIOCMGET, &modem_status) == -1) {
+    throw SerialIOException("failure during ::ioctl()", errno);
   }
-  return (status & TIOCM_CTS) != 0;
+  return modem_status;
+}
+
+bool Serial::SerialImpl::getCTS() const {
+  return getModemStatus() & TIOCM_CTS;
 }
 
 bool Serial::SerialImpl::getDSR() const {
-  if (!is_open_) {
-    throw SerialPortNotOpenException();
-  }
-  int status;
-  if (-1 == ioctl(fd_, TIOCMGET, &status)) {
-    throw (SerialIOException("getDSR() failed on a call to ioctl()"));
-  }
-  return (status & TIOCM_DSR) != 0;
+  return getModemStatus() & TIOCM_DSR;
 }
 
 bool Serial::SerialImpl::getRI() const {
-  if (!is_open_) {
-    throw SerialPortNotOpenException();
-  }
-  int status;
-  if (-1 == ioctl(fd_, TIOCMGET, &status)) {
-    throw (SerialIOException("getRI() failed on a call to ioctl()"));
-  }
-  return (status & TIOCM_RI) != 0;
+  return getModemStatus() & TIOCM_RI;
 }
 
 bool Serial::SerialImpl::getCD() const {
-  if (!is_open_) {
-    throw SerialPortNotOpenException();
-  }
-  int status;
-  if (-1 == ioctl(fd_, TIOCMGET, &status)) {
-    throw (SerialIOException("getCD() failed on a call to ioctl()"));
-  }
-  return (status & TIOCM_CD) != 0;
+  return getModemStatus() & TIOCM_CD;
 }
 
 #endif  // !defined(_WIN32)

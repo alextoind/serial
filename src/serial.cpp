@@ -26,8 +26,8 @@ using namespace serial;
 
 Serial::Serial(const std::string &port, uint32_t baudrate, Serial::Timeout timeout, bytesize_t bytesize, parity_t parity,
                stopbits_t stopbits, flowcontrol_t flowcontrol)
-    : pimpl_(new SerialImpl(port, baudrate, bytesize, parity, stopbits, flowcontrol)) {
-  pimpl_->setTimeout(timeout);
+    : pimpl_(new SerialImpl(port, baudrate, timeout, bytesize, parity, stopbits, flowcontrol)) {
+
 }
 
 Serial::~Serial() {
@@ -52,6 +52,10 @@ size_t Serial::available() {
 
 bool Serial::waitReadable() {
   return pimpl_->waitReadable(pimpl_->getTimeout().getReadConstant());
+}
+
+bool Serial::waitWritable() {
+  return pimpl_->waitWritable(pimpl_->getTimeout().getWriteConstant());
 }
 
 void Serial::waitByteTimes(size_t count) {
@@ -239,8 +243,8 @@ void Serial::setDTR(bool level) {
   pimpl_->setDTR(level);
 }
 
-bool Serial::waitForChange() {
-  return pimpl_->waitForChange();
+void Serial::waitForModemChanges() {
+  pimpl_->waitForModemChanges();
 }
 
 bool Serial::getCTS() {

@@ -33,11 +33,12 @@ inline std::wstring _prefix_port_if_needed(const std::wstring &input) {
   return input;
 }
 
-Serial::SerialImpl::SerialImpl(const std::string &port, unsigned long baudrate, bytesize_t bytesize, parity_t parity,
-                               stopbits_t stopbits, flowcontrol_t flowcontrol)
-    : port_(port.begin(), port.end()),
+Serial::SerialImpl::SerialImpl(std::string port, unsigned long baudrate, Timeout timeout, bytesize_t bytesize,
+                               parity_t parity, stopbits_t stopbits, flowcontrol_t flowcontrol)
+    : port_(std::move(port)),
       fd_(INVALID_HANDLE_VALUE),
       is_open_(false),
+      timeout_(timeout),
       baudrate_(baudrate),
       parity_(parity),
       bytesize_(bytesize),
@@ -54,23 +55,18 @@ Serial::SerialImpl::~SerialImpl() {
 
 void Serial::SerialImpl::open() {
   if (port_.empty()) {
-    throw SerialInvalidArgumentException("empty port is invalid.");
+    throw SerialInvalidArgumentException("serial port is empty.");
   }
   if (is_open_) {
     throw SerialException("serial port already open.");  //TODO: actually there is no need to throw exception in this case
   }
 
   // See: https://github.com/wjwwood/serial/issues/84
-  std::wstring port_with_prefix = _prefix_port_if_needed(port_);
+  std::wstring port_with_prefix = _prefix_port_if_needed(std::wstring(port_.begin(), port_.end()));
   LPCWSTR lp_port = port_with_prefix.c_str();
-  fd_ = CreateFileW(lp_port, GENERIC_READ | GENERIC_WRITE, 0, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr);
-
+  fd_ = ::CreateFileW(lp_port, GENERIC_READ | GENERIC_WRITE, 0, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr);
   if (fd_ == INVALID_HANDLE_VALUE) {
-    if (GetLastError() == ERROR_FILE_NOT_FOUND) {
-      throw SerialIOException("the specified port '" + getPort() + "' does not exist");
-    } else{
-      throw SerialIOException("error '" + std::to_string(GetLastError()) + "' while opening the serial port");
-    }
+    throw SerialIOException("failure during ::CreateFileW()", GetLastError());
   }
 
   reconfigurePort();
@@ -313,18 +309,11 @@ void Serial::SerialImpl::reconfigurePort() {
 }
 
 void Serial::SerialImpl::close() {
-  if (is_open_) {
-    if (fd_ != INVALID_HANDLE_VALUE) {
-      int ret;
-      ret = CloseHandle(fd_);
-      if (ret == 0) {
-        throw SerialIOException("error '" + std::to_string(GetLastError()) + "' while closing the serial port");
-      } else {
-        fd_ = INVALID_HANDLE_VALUE;
-      }
-    }
-    is_open_ = false;
+  if (is_open_ && fd_ != INVALID_HANDLE_VALUE && !::CloseHandle(fd_)) {
+    throw SerialIOException("failure during ::CloseHandle()", GetLastError());
   }
+  fd_ = INVALID_HANDLE_VALUE;
+  is_open_ = false;
 }
 
 bool Serial::SerialImpl::isOpen() const {
@@ -333,51 +322,61 @@ bool Serial::SerialImpl::isOpen() const {
 
 size_t Serial::SerialImpl::available() const {
   if (!is_open_) {
-    return 0;
+    throw SerialPortNotOpenException();
   }
-  COMSTAT cs;
-  if (!ClearCommError(fd_, nullptr, &cs)) {
-    throw SerialIOException("error '" + std::to_string(GetLastError()) + "' while checking status of the serial port");
+  COMSTAT stat;
+  if (!::ClearCommError(fd_, nullptr, &stat)) {
+    throw SerialIOException("during ::ClearCommError()", GetLastError());
   }
-  return static_cast<size_t>(cs.cbInQue);
+  return static_cast<size_t>(stat.cbInQue);
 }
 
-bool Serial::SerialImpl::waitReadable(std::chrono::milliseconds /*timeout*/) {
+bool Serial::SerialImpl::waitReadable(std::chrono::milliseconds timeout_ms) const {
   throw SerialException("waitReadable() is not implemented on Windows");
+  //TODO: have a deeper look at WaitForSingleObject
 }
 
-void Serial::SerialImpl::waitByteTimes(size_t /*count*/) const {
-  throw SerialException("waitByteTimes() is not implemented on Windows");
+bool Serial::SerialImpl::waitWritable(std::chrono::milliseconds timeout_ms) const {
+  throw SerialException("waitWritable() is not implemented on Windows");
+  //TODO: have a deeper look at WaitForSingleObject
+}
+
+void Serial::SerialImpl::waitByteTimes(size_t count) const {
+  auto start = std::chrono::steady_clock::now();
+  uint32_t bit_time_ns = 1e9 / baudrate_;
+  uint32_t byte_time_ns = bit_time_ns * (1 + bytesize_ + parity_ + stopbits_);
+  byte_time_ns += stopbits_ == stopbits_one_point_five ? -1.5*bit_time_ns : 0;  // stopbits_one_point_five is 3
+  std::this_thread::sleep_until(start + std::chrono::nanoseconds(byte_time_ns * count));
 }
 
 size_t Serial::SerialImpl::read(uint8_t *buf, size_t size) {
   if (!is_open_) {
     throw SerialPortNotOpenException();
   }
-  DWORD bytes_read;
-  if (!ReadFile(fd_, buf, static_cast<DWORD>(size), &bytes_read, nullptr)) {
-    throw SerialIOException("error '" + std::to_string(GetLastError()) + "' while reading from the serial port");
+  DWORD bytes_read = 0;
+  if (!::ReadFile(fd_, buf, static_cast<DWORD>(size), &bytes_read, nullptr)) {
+    throw SerialIOException("during ::ReadFile()", GetLastError());
   }
-  return (size_t)(bytes_read);
+  return static_cast<size_t>(bytes_read);
 }
 
-size_t Serial::SerialImpl::write(const uint8_t *data, size_t length) {
+size_t Serial::SerialImpl::write(const uint8_t *data, size_t size) {
   if (!is_open_) {
     throw SerialPortNotOpenException();
   }
-  DWORD bytes_written;
-  if (!WriteFile(fd_, data, static_cast<DWORD>(length), &bytes_written, nullptr)) {
-    throw SerialIOException("error '" + std::to_string(GetLastError()) + "' while writing to the serial port");
+  DWORD bytes_written = 0;
+  if (!::WriteFile(fd_, data, static_cast<DWORD>(size), &bytes_written, nullptr)) {
+    throw SerialIOException("during ::WriteFile()", GetLastError());
   }
-  return (size_t)(bytes_written);
+  return static_cast<size_t>(bytes_written);
 }
 
 void Serial::SerialImpl::setPort(const std::string &port) {
-  port_ = std::wstring(port.begin(), port.end());
+  port_ = port;
 }
 
 std::string Serial::SerialImpl::getPort() const {
-  return std::string(port_.begin(), port_.end());
+  return port_;
 }
 
 void Serial::SerialImpl::setTimeout(Serial::Timeout &timeout) {
@@ -450,103 +449,92 @@ void Serial::SerialImpl::flush() const {
   if (!is_open_) {
     throw SerialPortNotOpenException();
   }
-  PurgeComm(fd_, PURGE_RXCLEAR | PURGE_TXCLEAR);
+  if (!::PurgeComm(fd_, PURGE_RXCLEAR | PURGE_TXCLEAR)) {
+    throw SerialIOException("failure during ::EscapeCommFunction()");
+  }
 }
 
 void Serial::SerialImpl::flushInput() const {
   if (!is_open_) {
     throw SerialPortNotOpenException();
   }
-  PurgeComm(fd_, PURGE_RXCLEAR);
+  if (!::PurgeComm(fd_, PURGE_RXCLEAR)) {
+    throw SerialIOException("failure during ::EscapeCommFunction()");
+  }
 }
 
 void Serial::SerialImpl::flushOutput() const {
   if (!is_open_) {
     throw SerialPortNotOpenException();
   }
-  PurgeComm(fd_, PURGE_TXCLEAR);
+  if (!::PurgeComm(fd_, PURGE_TXCLEAR)) {
+    throw SerialIOException("failure during ::EscapeCommFunction()");
+  }
 }
 
-void Serial::SerialImpl::sendBreak(int /*duration*/) const {
+void Serial::SerialImpl::sendBreak(int duration_ms) const {
   throw SerialException("sendBreak() is not implemented on Windows");
 }
 
 void Serial::SerialImpl::setBreak(bool level) const {
+  setModemStatus(level ? SETBREAK : CLRBREAK);
+}
+
+void Serial::SerialImpl::setModemStatus(uint32_t request, uint32_t command) const {
   if (!is_open_) {
     throw SerialPortNotOpenException();
   }
-  EscapeCommFunction(fd_, level ? SETBREAK : CLRBREAK);
+  if (!::EscapeCommFunction(fd_, request)) {
+    throw SerialIOException("failure during ::EscapeCommFunction()");
+  }
 }
 
 void Serial::SerialImpl::setRTS(bool level) const {
-  if (!is_open_) {
-    throw SerialPortNotOpenException();
-  }
-  EscapeCommFunction(fd_, level ? SETRTS : CLRRTS);
+  setModemStatus(level ? SETRTS : CLRRTS);
 }
 
 void Serial::SerialImpl::setDTR(bool level) const {
-  if (!is_open_) {
-    throw SerialPortNotOpenException();
-  }
-  EscapeCommFunction(fd_, level ? SETDTR : CLRDTR);
+  setModemStatus(level ? SETDTR : CLRDTR);
 }
 
-bool Serial::SerialImpl::waitForChange() const {
+void Serial::SerialImpl::waitForModemChanges() const {
   if (!is_open_) {
     throw SerialPortNotOpenException();
   }
-  DWORD dwCommEvent;
-  if (!SetCommMask(fd_, EV_CTS | EV_DSR | EV_RING | EV_RLSD)) {
-    // Error setting communications mask
-    return false;
+  if (!::SetCommMask(fd_, EV_CTS | EV_DSR | EV_RING | EV_RLSD)) {
+    throw SerialIOException("failure during ::SetCommMask()");
   }
-  return WaitCommEvent(fd_, &dwCommEvent, nullptr) != 0;
+  DWORD event;
+  if (!::WaitCommEvent(fd_, &event, nullptr)) {
+    throw SerialIOException("failure during ::WaitCommEvent()");
+  }
+}
+
+uint32_t Serial::SerialImpl::getModemStatus() const {
+  if (!is_open_) {
+    throw SerialPortNotOpenException();
+  }
+  DWORD modem_status;
+  if (!::GetCommModemStatus(fd_, &modem_status)) {
+    throw SerialIOException("failure during ::GetCommModemStatus()");
+  }
+  return modem_status;
 }
 
 bool Serial::SerialImpl::getCTS() const {
-  if (!is_open_) {
-    throw SerialPortNotOpenException();
-  }
-  DWORD dwModemStatus;
-  if (!GetCommModemStatus(fd_, &dwModemStatus)) {
-    throw SerialIOException("getCTS() failed on a call to GetCommModemStatus()");
-  }
-
-  return (MS_CTS_ON & dwModemStatus) != 0;
+  return getModemStatus() & MS_CTS_ON;
 }
 
 bool Serial::SerialImpl::getDSR() const {
-  if (!is_open_) {
-    throw SerialPortNotOpenException();
-  }
-  DWORD dwModemStatus;
-  if (!GetCommModemStatus(fd_, &dwModemStatus)) {
-    throw SerialIOException("getDSR() failed on a call to GetCommModemStatus()");
-  }
-  return (MS_DSR_ON & dwModemStatus) != 0;
+  return getModemStatus() & MS_DSR_ON;
 }
 
 bool Serial::SerialImpl::getRI() const {
-  if (!is_open_) {
-    throw SerialPortNotOpenException();
-  }
-  DWORD dwModemStatus;
-  if (!GetCommModemStatus(fd_, &dwModemStatus)) {
-    throw SerialIOException("getRI() failed on a call to GetCommModemStatus()");
-  }
-  return (MS_RING_ON & dwModemStatus) != 0;
+  return getModemStatus() & MS_RING_ON;
 }
 
 bool Serial::SerialImpl::getCD() const {
-  if (!is_open_) {
-    throw SerialPortNotOpenException();
-  }
-  DWORD dwModemStatus;
-  if (!GetCommModemStatus(fd_, &dwModemStatus)) {
-    throw SerialIOException("getCD() failed on a call to GetCommModemStatus()");
-  }
-  return (MS_RLSD_ON & dwModemStatus) != 0;
+  return getModemStatus() & MS_RLSD_ON;
 }
 
 #endif  // defined(_WIN32)
