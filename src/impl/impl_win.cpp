@@ -353,22 +353,22 @@ size_t Serial::SerialImpl::read(uint8_t *buf, size_t size) {
   if (!is_open_) {
     throw SerialPortNotOpenException();
   }
-  DWORD bytes_read;
-  if (!ReadFile(fd_, buf, static_cast<DWORD>(size), &bytes_read, nullptr)) {
-    throw SerialIOException("error '" + std::to_string(GetLastError()) + "' while reading from the serial port");
+  DWORD bytes_read = 0;
+  if (!::ReadFile(fd_, buf, static_cast<DWORD>(size), &bytes_read, nullptr)) {
+    throw SerialIOException("during ::ReadFile()", GetLastError());
   }
-  return (size_t)(bytes_read);
+  return static_cast<size_t>(bytes_read);
 }
 
-size_t Serial::SerialImpl::write(const uint8_t *data, size_t length) {
+size_t Serial::SerialImpl::write(const uint8_t *data, size_t size) {
   if (!is_open_) {
     throw SerialPortNotOpenException();
   }
-  DWORD bytes_written;
-  if (!WriteFile(fd_, data, static_cast<DWORD>(length), &bytes_written, nullptr)) {
-    throw SerialIOException("error '" + std::to_string(GetLastError()) + "' while writing to the serial port");
+  DWORD bytes_written = 0;
+  if (!::WriteFile(fd_, data, static_cast<DWORD>(size), &bytes_written, nullptr)) {
+    throw SerialIOException("during ::WriteFile()", GetLastError());
   }
-  return (size_t)(bytes_written);
+  return static_cast<size_t>(bytes_written);
 }
 
 void Serial::SerialImpl::setPort(const std::string &port) {
