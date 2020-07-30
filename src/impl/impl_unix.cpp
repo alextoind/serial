@@ -25,6 +25,7 @@
 
 using namespace serial;
 
+//TODO: remove if no longer used (it was used by pselect and ppoll)
 template<typename T>
 timespec getTimeSpec(std::chrono::duration<int64_t, T> duration) {
   using namespace std::chrono;
@@ -460,13 +461,12 @@ size_t Serial::SerialImpl::available() const {
 }
 
 bool waitOnPoll(std::chrono::milliseconds timeout_ms, std::unique_ptr<pollfd> fds) {
-  timespec timeout = getTimeSpec(timeout_ms);
-  int r = ppoll(fds.get(), 1, &timeout, nullptr);
+  int r = ::poll(fds.get(), 1, timeout_ms.count());
   if (r < 0 && errno != EINTR) {
-    throw SerialIOException("failure during ::ppoll()", errno);
+    throw SerialIOException("failure during ::poll()", errno);
   }
   if (fds->revents == POLLERR || fds->revents == POLLHUP || fds->revents == POLLNVAL) {
-    throw SerialIOException("failure during ::ppoll(), revents has been set to '" + std::to_string(fds->revents) + "'.");
+    throw SerialIOException("failure during ::poll(), revents has been set to '" + std::to_string(fds->revents) + "'.");
   }
   return r > 0;
 }
