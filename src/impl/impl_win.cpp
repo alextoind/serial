@@ -66,7 +66,7 @@ void Serial::SerialImpl::open() {
   LPCWSTR lp_port = port_with_prefix.c_str();
   fd_ = ::CreateFileW(lp_port, GENERIC_READ | GENERIC_WRITE, 0, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr);
   if (fd_ == INVALID_HANDLE_VALUE) {
-    throw SerialIOException("failure during ::CreateFileW()", GetLastError());
+    throw SerialIOException("failure during ::CreateFileW()", ::GetLastError());
   }
 
   reconfigurePort();
@@ -310,7 +310,7 @@ void Serial::SerialImpl::reconfigurePort() {
 
 void Serial::SerialImpl::close() {
   if (is_open_ && fd_ != INVALID_HANDLE_VALUE && !::CloseHandle(fd_)) {
-    throw SerialIOException("failure during ::CloseHandle()", GetLastError());
+    throw SerialIOException("failure during ::CloseHandle()", ::GetLastError());
   }
   fd_ = INVALID_HANDLE_VALUE;
   is_open_ = false;
@@ -326,7 +326,7 @@ size_t Serial::SerialImpl::available() const {
   }
   COMSTAT stat;
   if (!::ClearCommError(fd_, nullptr, &stat)) {
-    throw SerialIOException("during ::ClearCommError()", GetLastError());
+    throw SerialIOException("during ::ClearCommError()", ::GetLastError());
   }
   return static_cast<size_t>(stat.cbInQue);
 }
@@ -355,7 +355,7 @@ size_t Serial::SerialImpl::read(uint8_t *buf, size_t size) {
   }
   DWORD bytes_read = 0;
   if (!::ReadFile(fd_, buf, static_cast<DWORD>(size), &bytes_read, nullptr)) {
-    throw SerialIOException("during ::ReadFile()", GetLastError());
+    throw SerialIOException("during ::ReadFile()", ::GetLastError());
   }
   return static_cast<size_t>(bytes_read);
 }
@@ -366,7 +366,7 @@ size_t Serial::SerialImpl::write(const uint8_t *data, size_t size) {
   }
   DWORD bytes_written = 0;
   if (!::WriteFile(fd_, data, static_cast<DWORD>(size), &bytes_written, nullptr)) {
-    throw SerialIOException("during ::WriteFile()", GetLastError());
+    throw SerialIOException("during ::WriteFile()", ::GetLastError());
   }
   return static_cast<size_t>(bytes_written);
 }
