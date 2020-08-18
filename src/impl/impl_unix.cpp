@@ -326,9 +326,8 @@ void Serial::SerialImpl::reconfigurePort() {
 
   if (baudrate == baudrate_) {  // custom baudrate
 #if defined(__APPLE__)
-    speed_t baudrate = static_cast<speed_t>(baudrate_);
-    if (::ioctl(fd_, IOSSIOSPEED, &baudrate, 1) == -1) {
-      throw SerialIOException("failure during ::ioctl()", errno);
+    if (::ioctl(fd_, IOSSIOSPEED, &baudrate) == -1) {
+      throw SerialIOException("failure during ::ioctl(IOSSIOSPEED)", errno);
     }
 #elif defined(__linux__) && defined (TIOCSSERIAL)  //TODO: maybe termios2 could be an alternative
     struct serial_struct serial {0};
