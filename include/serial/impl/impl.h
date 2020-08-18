@@ -141,25 +141,19 @@ class Serial::SerialImpl {
   void reconfigurePort();
 
  private:
-  std::string port_;
 #if !defined(_WIN32)
   int fd_;
 #else
   HANDLE fd_;
 #endif
-
+  std::string port_;
   bool is_open_;
-#if !defined(_WIN32)
-  bool xonxoff_;
-  bool rtscts_;
-#endif
-
-  Timeout timeout_;           // Timeout for read operations
-  unsigned long baudrate_;    // Baudrate
-  parity_t parity_;           // Parity
-  bytesize_t bytesize_;       // Size of the bytes
-  stopbits_t stopbits_;       // Stop Bits
-  flowcontrol_t flowcontrol_; // Flow Control
+  Timeout timeout_;
+  unsigned long baudrate_;
+  parity_t parity_;
+  bytesize_t bytesize_;
+  stopbits_t stopbits_;
+  flowcontrol_t flowcontrol_;
 };
 }  // namespace serial
 
