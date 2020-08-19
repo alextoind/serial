@@ -75,236 +75,80 @@ void Serial::SerialImpl::open() {
 
 void Serial::SerialImpl::reconfigurePort() {
   if (fd_ == INVALID_HANDLE_VALUE) {
-    throw SerialIOException("invalid file descriptor, is the serial port open?");
+    throw SerialInvalidArgumentException("invalid file descriptor");
   }
 
   DCB dcbSerialParams = {0};
   dcbSerialParams.DCBlength = sizeof(dcbSerialParams);
-  if (!GetCommState(fd_, &dcbSerialParams)) {
-    throw SerialIOException("error getting the serial port state.");
+  if (!::GetCommState(fd_, &dcbSerialParams)) {
+    throw SerialIOException("failure during ::GetCommState()", ::GetLastError());
   }
 
-  // setup baud rate
-  switch (baudrate_) {
-#ifdef CBR_0
-    case 0:
-      dcbSerialParams.BaudRate = CBR_0;
-      break;
-#endif
-#ifdef CBR_50
-    case 50:
-      dcbSerialParams.BaudRate = CBR_50;
-      break;
-#endif
-#ifdef CBR_75
-    case 75:
-      dcbSerialParams.BaudRate = CBR_75;
-      break;
-#endif
-#ifdef CBR_110
-    case 110:
-      dcbSerialParams.BaudRate = CBR_110;
-      break;
-#endif
-#ifdef CBR_134
-    case 134:
-      dcbSerialParams.BaudRate = CBR_134;
-      break;
-#endif
-#ifdef CBR_150
-    case 150:
-      dcbSerialParams.BaudRate = CBR_150;
-      break;
-#endif
-#ifdef CBR_200
-    case 200:
-      dcbSerialParams.BaudRate = CBR_200;
-      break;
-#endif
-#ifdef CBR_300
-    case 300:
-      dcbSerialParams.BaudRate = CBR_300;
-      break;
-#endif
-#ifdef CBR_600
-    case 600:
-      dcbSerialParams.BaudRate = CBR_600;
-      break;
-#endif
-#ifdef CBR_1200
-    case 1200:
-      dcbSerialParams.BaudRate = CBR_1200;
-      break;
-#endif
-#ifdef CBR_1800
-    case 1800:
-      dcbSerialParams.BaudRate = CBR_1800;
-      break;
-#endif
-#ifdef CBR_2400
-    case 2400:
-      dcbSerialParams.BaudRate = CBR_2400;
-      break;
-#endif
-#ifdef CBR_4800
-    case 4800:
-      dcbSerialParams.BaudRate = CBR_4800;
-      break;
-#endif
-#ifdef CBR_7200
-    case 7200:
-      dcbSerialParams.BaudRate = CBR_7200;
-      break;
-#endif
-#ifdef CBR_9600
-    case 9600:
-      dcbSerialParams.BaudRate = CBR_9600;
-      break;
-#endif
-#ifdef CBR_14400
-    case 14400:
-      dcbSerialParams.BaudRate = CBR_14400;
-      break;
-#endif
-#ifdef CBR_19200
-    case 19200:
-      dcbSerialParams.BaudRate = CBR_19200;
-      break;
-#endif
-#ifdef CBR_28800
-    case 28800:
-      dcbSerialParams.BaudRate = CBR_28800;
-      break;
-#endif
-#ifdef CBR_57600
-    case 57600:
-      dcbSerialParams.BaudRate = CBR_57600;
-      break;
-#endif
-#ifdef CBR_76800
-    case 76800:
-      dcbSerialParams.BaudRate = CBR_76800;
-      break;
-#endif
-#ifdef CBR_38400
-    case 38400:
-      dcbSerialParams.BaudRate = CBR_38400;
-      break;
-#endif
-#ifdef CBR_115200
-    case 115200:
-      dcbSerialParams.BaudRate = CBR_115200;
-      break;
-#endif
-#ifdef CBR_128000
-    case 128000:
-      dcbSerialParams.BaudRate = CBR_128000;
-      break;
-#endif
-#ifdef CBR_153600
-    case 153600:
-      dcbSerialParams.BaudRate = CBR_153600;
-      break;
-#endif
-#ifdef CBR_230400
-    case 230400:
-      dcbSerialParams.BaudRate = CBR_230400;
-      break;
-#endif
-#ifdef CBR_256000
-    case 256000:
-      dcbSerialParams.BaudRate = CBR_256000;
-      break;
-#endif
-#ifdef CBR_460800
-    case 460800:
-      dcbSerialParams.BaudRate = CBR_460800;
-      break;
-#endif
-#ifdef CBR_921600
-    case 921600:
-      dcbSerialParams.BaudRate = CBR_921600;
-      break;
-#endif
+  dcbSerialParams.BaudRate = baudrate_;
+
+  switch (bytesize_) {
+    case eightbits: dcbSerialParams.ByteSize = 8; break;
+    case sevenbits: dcbSerialParams.ByteSize = 7; break;
+    case sixbits: dcbSerialParams.ByteSize = 6; break;
+    case fivebits: dcbSerialParams.ByteSize = 5; break;
     default:
-      // Try to blindly assign it
-      dcbSerialParams.BaudRate = baudrate_;
+      throw SerialInvalidArgumentException("invalid byte size");
   }
 
-  // setup char len
-  if (bytesize_ == eightbits) {
-    dcbSerialParams.ByteSize = 8;
-  } else if (bytesize_ == sevenbits) {
-    dcbSerialParams.ByteSize = 7;
-  } else if (bytesize_ == sixbits) {
-    dcbSerialParams.ByteSize = 6;
-  } else if (bytesize_ == fivebits) {
-    dcbSerialParams.ByteSize = 5;
-  } else {
-    throw SerialInvalidArgumentException("invalid char len");
+  switch (stopbits_) {
+    case stopbits_one: dcbSerialParams.StopBits = ONESTOPBIT; break;
+    case stopbits_one_point_five: dcbSerialParams.StopBits = ONE5STOPBITS; break;
+    case stopbits_two: dcbSerialParams.StopBits = TWOSTOPBITS; break;
+    default:
+      throw SerialInvalidArgumentException("invalid stop bit");
   }
 
-  // setup stopbits
-  if (stopbits_ == stopbits_one) {
-    dcbSerialParams.StopBits = ONESTOPBIT;
-  } else if (stopbits_ == stopbits_one_point_five) {
-    dcbSerialParams.StopBits = ONE5STOPBITS;
-  } else if (stopbits_ == stopbits_two) {
-    dcbSerialParams.StopBits = TWOSTOPBITS;
-  } else {
-    throw SerialInvalidArgumentException("invalid stop bit");
+  switch (parity_) {
+    case parity_none: dcbSerialParams.Parity = NOPARITY; break;
+    case parity_even: dcbSerialParams.Parity = EVENPARITY; break;
+    case parity_odd: dcbSerialParams.Parity = ODDPARITY; break;
+    case parity_mark: dcbSerialParams.Parity = MARKPARITY; break;
+    case parity_space: dcbSerialParams.Parity = SPACEPARITY; break;
+    default:
+      throw SerialInvalidArgumentException("invalid parity");
   }
 
-  // setup parity
-  if (parity_ == parity_none) {
-    dcbSerialParams.Parity = NOPARITY;
-  } else if (parity_ == parity_even) {
-    dcbSerialParams.Parity = EVENPARITY;
-  } else if (parity_ == parity_odd) {
-    dcbSerialParams.Parity = ODDPARITY;
-  } else if (parity_ == parity_mark) {
-    dcbSerialParams.Parity = MARKPARITY;
-  } else if (parity_ == parity_space) {
-    dcbSerialParams.Parity = SPACEPARITY;
-  } else {
-    throw SerialInvalidArgumentException("invalid parity");
+  //TODO: missing fOutxDsrFlow and fDtrControl
+  switch (flowcontrol_) {
+    case flowcontrol_none:
+      dcbSerialParams.fOutxCtsFlow = false;
+      dcbSerialParams.fRtsControl = RTS_CONTROL_DISABLE;
+      dcbSerialParams.fOutX = false;
+      dcbSerialParams.fInX = false;
+      break;
+    case flowcontrol_software:
+      dcbSerialParams.fOutxCtsFlow = false;
+      dcbSerialParams.fRtsControl = RTS_CONTROL_DISABLE;
+      dcbSerialParams.fOutX = true;
+      dcbSerialParams.fInX = true;
+      break;
+    case flowcontrol_hardware:
+      dcbSerialParams.fOutxCtsFlow = true;
+      dcbSerialParams.fRtsControl = RTS_CONTROL_HANDSHAKE;
+      dcbSerialParams.fOutX = false;
+      dcbSerialParams.fInX = false;
+      break;
+    default:
+      throw SerialInvalidArgumentException("invalid flow control");
   }
 
-  // setup flowcontrol
-  if (flowcontrol_ == flowcontrol_none) {
-    dcbSerialParams.fOutxCtsFlow = false;
-    dcbSerialParams.fRtsControl = RTS_CONTROL_DISABLE;
-    dcbSerialParams.fOutX = false;
-    dcbSerialParams.fInX = false;
-  }
-  if (flowcontrol_ == flowcontrol_software) {
-    dcbSerialParams.fOutxCtsFlow = false;
-    dcbSerialParams.fRtsControl = RTS_CONTROL_DISABLE;
-    dcbSerialParams.fOutX = true;
-    dcbSerialParams.fInX = true;
-  }
-  if (flowcontrol_ == flowcontrol_hardware) {
-    dcbSerialParams.fOutxCtsFlow = true;
-    dcbSerialParams.fRtsControl = RTS_CONTROL_HANDSHAKE;
-    dcbSerialParams.fOutX = false;
-    dcbSerialParams.fInX = false;
+  if (!::SetCommState(fd_, &dcbSerialParams)) {
+    throw SerialIOException("failure during ::SetCommState()", ::GetLastError());
   }
 
-  // activate settings
-  if (!SetCommState(fd_, &dcbSerialParams)) {
-    CloseHandle(fd_);
-    throw SerialIOException("error setting serial port settings.");
-  }
-
-  // Setup timeouts
   COMMTIMEOUTS timeouts = {0};
   timeouts.ReadIntervalTimeout = timeout_.getInterByteMilliseconds();
   timeouts.ReadTotalTimeoutConstant = timeout_.getReadConstantMilliseconds();
   timeouts.ReadTotalTimeoutMultiplier = timeout_.getReadMultiplierMilliseconds();
   timeouts.WriteTotalTimeoutConstant = timeout_.getWriteConstantMilliseconds();
   timeouts.WriteTotalTimeoutMultiplier = timeout_.getWriteMultiplierMilliseconds();
-  if (!SetCommTimeouts(fd_, &timeouts)) {
-    throw SerialIOException("error setting timeouts.");
+  if (!::SetCommTimeouts(fd_, &timeouts)) {
+    throw SerialIOException("failure during ::SetCommTimeouts()", ::GetLastError());
   }
 }
 
