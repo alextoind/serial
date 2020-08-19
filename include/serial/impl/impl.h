@@ -35,7 +35,7 @@
 #include <poll.h>
 
 #if defined(__linux__)
-#include <linux/serial.h>
+#include <linux/serial.h>  //TODO: maybe termios2 could be an alternative
 #elif defined(__MACH__)
 #include <AvailabilityMacros.h>
 #include <mach/clock.h>

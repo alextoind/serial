@@ -84,8 +84,7 @@ void Serial::SerialImpl::reconfigurePort() {
   }
 
   // input modes
-  options.c_iflag &= ~(IGNBRK | BRKINT | IGNPAR | PARMRK | INPCK | ISTRIP | INLCR | IGNCR | ICRNL | IXON | IXOFF |
-                       IXANY);
+  options.c_iflag &= ~(IGNBRK | BRKINT | IGNPAR | PARMRK | INPCK | ISTRIP | INLCR | IGNCR | ICRNL | IXON | IXOFF | IXANY);
 #ifdef IUCLC
   options.c_iflag &= ~IUCLC;
 #endif
@@ -143,6 +142,7 @@ void Serial::SerialImpl::reconfigurePort() {
   options.c_cc[VMIN] = 0;
   options.c_cc[VTIME] = 0;
 
+  bool use_custom_baudrate = false;
   speed_t baudrate = 0;
   switch (baudrate_) {
 #ifdef B0
@@ -259,10 +259,12 @@ void Serial::SerialImpl::reconfigurePort() {
 #ifdef B4000000
     case 4000000: baudrate = B4000000; break;
 #endif
-    default: baudrate = baudrate_;
+    default:
+      baudrate = baudrate_;
+      use_custom_baudrate = true;
   }
 
-  if (baudrate != baudrate_ || baudrate == 0) {  // standard baudrate
+  if (!use_custom_baudrate) {
     if (::cfsetispeed(&options, baudrate) == -1) {
       throw SerialIOException("failure during ::cfsetispeed()", errno);
     }
@@ -272,51 +274,42 @@ void Serial::SerialImpl::reconfigurePort() {
   }
 
   switch (bytesize_) {
-    case eightbits: options.c_cflag |= CS8;
-      break;
-    case sevenbits: options.c_cflag |= CS7;
-      break;
-    case sixbits: options.c_cflag |= CS6;
-      break;
-    case fivebits: options.c_cflag |= CS5;
-      break;
-    default:throw SerialInvalidArgumentException("invalid byte size");
+    case eightbits: options.c_cflag |= CS8; break;
+    case sevenbits: options.c_cflag |= CS7; break;
+    case sixbits: options.c_cflag |= CS6; break;
+    case fivebits: options.c_cflag |= CS5; break;
+    default:
+      throw SerialInvalidArgumentException("invalid byte size");
   }
 
   switch (stopbits_) {
-    case stopbits_one: options.c_cflag &= ~CSTOPB;
-      break;
+    case stopbits_one: options.c_cflag &= ~CSTOPB; break;
     case stopbits_one_point_five:  // there is no POSIX support for 1.5 stop bit
-    case stopbits_two: options.c_cflag |= CSTOPB;
-      break;
-    default:throw SerialInvalidArgumentException("invalid stop bit");
+    case stopbits_two: options.c_cflag |= CSTOPB; break;
+    default:
+      throw SerialInvalidArgumentException("invalid stop bit");
   }
 
   switch (parity_) {
-    case parity_none: options.c_iflag |= IGNPAR;
-      break;
-    case parity_even: options.c_cflag |= PARENB;
-      break;
-    case parity_odd: options.c_cflag |= (PARENB | PARODD);
-      break;
+    case parity_none: options.c_iflag |= IGNPAR; break;
+    case parity_even: options.c_cflag |= PARENB; break;
+    case parity_odd: options.c_cflag |= (PARENB | PARODD); break;
 #ifdef CMSPAR
-    case parity_mark: options.c_cflag |= (PARENB | PARODD | CMSPAR);
-      break;
-    case parity_space: options.c_cflag |= (PARENB | CMSPAR);
-      break;
+    case parity_mark: options.c_cflag |= (PARENB | PARODD | CMSPAR); break;
+    case parity_space: options.c_cflag |= (PARENB | CMSPAR); break;
 #endif
-    default:throw SerialInvalidArgumentException("invalid parity");
+    default:
+      throw SerialInvalidArgumentException("invalid parity");
   }
 
   switch (flowcontrol_) {
     case flowcontrol_none: break;
-    case flowcontrol_software: options.c_iflag |= (IXON | IXOFF | IXANY);
-      break;
+    case flowcontrol_software: options.c_iflag |= (IXON | IXOFF | IXANY); break;
 #ifdef CRTSCTS
-    case flowcontrol_hardware: options.c_cflag |= (CRTSCTS);
-      break;
+    case flowcontrol_hardware: options.c_cflag |= (CRTSCTS); break;
 #endif
-    default:throw SerialInvalidArgumentException("invalid flow control");
+    default:
+      throw SerialInvalidArgumentException("invalid flow control");
   }
 
   // activate settings
@@ -324,7 +317,7 @@ void Serial::SerialImpl::reconfigurePort() {
     throw SerialIOException("failure during ::tcsetattr()", errno);
   }
 
-  if (baudrate == baudrate_) {  // custom baudrate
+  if (use_custom_baudrate) {
 #if defined(__APPLE__)
     if (::ioctl(fd_, IOSSIOSPEED, &baudrate) == -1) {
       throw SerialIOException("failure during ::ioctl(IOSSIOSPEED)", errno);
@@ -347,7 +340,7 @@ void Serial::SerialImpl::reconfigurePort() {
       throw SerialIOException("failure during ::ioctl()", errno);
     }
 #else
-    throw SerialInvalidArgumentException("OS does not currently support custom bauds");
+    throw SerialInvalidArgumentException("custom baudrates are not supported on current OS");
 #endif
   }
 }
