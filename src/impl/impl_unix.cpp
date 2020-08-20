@@ -25,13 +25,6 @@
 
 using namespace serial;
 
-//TODO: remove if no longer used (it was used by pselect and ppoll)
-template<typename T>
-timespec getTimeSpec(std::chrono::duration<int64_t, T> duration) {
-  using namespace std::chrono;
-  return {duration_cast<seconds>(duration).count(), (duration_cast<nanoseconds>(duration) - duration_cast<seconds>(duration)).count()};
-}
-
 Serial::SerialImpl::SerialImpl(std::string port, unsigned long baudrate, Timeout timeout, bytesize_t bytesize,
                                parity_t parity, stopbits_t stopbits, flowcontrol_t flowcontrol)
     : port_(std::move(port)),
