@@ -58,7 +58,7 @@ class SerialTests : public ::testing::Test {
 
 TEST_F(SerialTests, OpenAndClose) {
   EXPECT_TRUE(serial_port_->isOpen());
-  EXPECT_THROW(serial_port_->open(), SerialException);  // already open
+  EXPECT_NO_THROW(serial_port_->open());
   EXPECT_TRUE(serial_port_->isOpen());
   EXPECT_NO_THROW(serial_port_->close());
   EXPECT_FALSE(serial_port_->isOpen());

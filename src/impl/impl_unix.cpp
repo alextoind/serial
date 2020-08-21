@@ -50,7 +50,7 @@ void Serial::SerialImpl::open() {
     throw SerialInvalidArgumentException("serial port is empty.");
   }
   if (is_open_) {
-    throw SerialException("serial port already open.");  //TODO: actually there is no need to throw exception in this case
+    return;
   }
 
   fd_ = ::open(port_.c_str(), O_RDWR | O_NOCTTY | O_NONBLOCK | O_CLOEXEC);

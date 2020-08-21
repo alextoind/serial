@@ -58,7 +58,7 @@ void Serial::SerialImpl::open() {
     throw SerialInvalidArgumentException("serial port is empty.");
   }
   if (is_open_) {
-    throw SerialException("serial port already open.");  //TODO: actually there is no need to throw exception in this case
+    return;
   }
 
   // See: https://github.com/wjwwood/serial/issues/84
