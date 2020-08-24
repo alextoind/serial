@@ -62,6 +62,8 @@ void Serial::SerialImpl::open() {
     throw SerialIOException("failure during ::open()", errno);
   }
 
+  //TODO: check TIOCEXCL
+
   reconfigurePort();
   is_open_ = true;
 }
@@ -321,6 +323,7 @@ void Serial::SerialImpl::reconfigurePort() {
       throw SerialIOException("failure during ::ioctl()", errno);
     }
 
+    //TODO: check ASYNC_LOW_LATENCY
     serial.flags &= ~ASYNC_SPD_MASK;
     serial.flags |= ASYNC_SPD_CUST;
     serial.custom_divisor = static_cast<int>((serial.baud_base + baudrate_ / 2) / baudrate_);

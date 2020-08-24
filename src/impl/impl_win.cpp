@@ -113,7 +113,7 @@ void Serial::SerialImpl::reconfigurePort() {
       throw SerialInvalidArgumentException("invalid parity");
   }
 
-  //TODO: missing fOutxDsrFlow and fDtrControl
+  //TODO: missing fOutxDsrFlow and fDtrControl (and many others)
   switch (flowcontrol_) {
     case flowcontrol_none:
       dcbSerialParams.fOutxCtsFlow = false;
