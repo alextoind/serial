@@ -174,7 +174,7 @@ std::string rtrim(const std::string &str) {
   return result;
 }
 
-int serial::getPortInfo(std::vector<PortInfo> &serial_ports) {
+int PortInfo::getPortInfo(std::vector<PortInfo> &serial_ports) {
   //TODO
   return 0;
 }
@@ -227,7 +227,7 @@ int serial::getPortsInfo(std::vector<PortInfo> &serial_ports) {
   return serial_ports.size();
 }
 
-int getPortsList(std::vector<std::string> &serial_port_names) {
+int serial::getPortsList(std::vector<std::string> &serial_port_names) {
   serial_port_names.clear();
   //TODO
   return 0;
