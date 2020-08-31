@@ -23,7 +23,6 @@
 #define SERIAL_IMPL_H
 
 #include <serial/serial.h>
-#include <thread>
 
 #if defined(_WIN32)
 #include <windows.h>

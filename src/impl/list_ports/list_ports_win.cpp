@@ -26,113 +26,234 @@
 #include <windows.h>
 #include <setupapi.h>
 #include <initguid.h>
-#include <devguid.h>
-#include <cstring>
+#include <cfgmgr32.h>
+#include <usbioctl.h>
+#include <usbiodef.h>
 
 #include <serial/serial.h>
 
 using namespace serial;
 
-static const DWORD port_name_max_length = 256;
-static const DWORD friendly_name_max_length = 256;
-static const DWORD hardware_id_max_length = 256;
+std::string escape(const std::string &str) {
+  return R"(\\.\)" + str;
+}
 
-// Convert a wide Unicode string to an UTF8 string
-std::string utf8_encode(const std::wstring &wstr) {
-  int size_needed = WideCharToMultiByte(CP_UTF8, 0, &wstr[0], (int)wstr.size(), nullptr, 0, nullptr, nullptr);
-  std::string strTo(size_needed, 0);
-  WideCharToMultiByte(CP_UTF8, 0, &wstr[0], (int)wstr.size(), &strTo[0], size_needed, nullptr, nullptr);
-  return strTo;
+template <typename T>
+std::shared_ptr<T> sharedPtr(size_t size = 0) {
+  std::shared_ptr<T> ptr(static_cast<T*>(::malloc(sizeof(T) + size)), ::free);
+  ::memset(ptr.get(), 0, sizeof(T)+size);
+  return ptr;
+}
+
+std::string getDeviceDescriptor(HANDLE handle, DWORD connection_index, UCHAR descriptor_index) {
+  if (!descriptor_index) {
+    return "";
+  }
+
+  char buffer[sizeof(USB_DESCRIPTOR_REQUEST) + MAXIMUM_USB_STRING_LENGTH] = {0};
+  auto request = reinterpret_cast<PUSB_DESCRIPTOR_REQUEST>(buffer);
+  auto descriptor = reinterpret_cast<PUSB_STRING_DESCRIPTOR>(request+1);
+  DWORD size = sizeof(buffer);
+
+  request->ConnectionIndex = connection_index;
+  request->SetupPacket.bmRequest = 0x80;
+  request->SetupPacket.bRequest = USB_REQUEST_GET_DESCRIPTOR;
+  request->SetupPacket.wIndex = 0;
+  request->SetupPacket.wLength = MAXIMUM_USB_STRING_LENGTH;
+  request->SetupPacket.wValue = (USB_STRING_DESCRIPTOR_TYPE << 8) | descriptor_index;
+  if (!::DeviceIoControl(handle, IOCTL_USB_GET_DESCRIPTOR_FROM_NODE_CONNECTION, request, size, request, size, &size, nullptr)) {
+    return "";
+  }
+
+  std::wstring wstr(descriptor->bString);
+  return std::string(wstr.begin(), wstr.end());
+}
+
+std::string getDevicePath(const GUID &guid, DEVINST instance, DWORD &busnum) {
+  std::string device_path;
+  HDEVINFO device_info = ::SetupDiGetClassDevsW(&guid, nullptr, nullptr, DIGCF_PRESENT | DIGCF_DEVICEINTERFACE);
+  if (device_info != INVALID_HANDLE_VALUE) {
+    auto device_info_data = sharedPtr<SP_DEVINFO_DATA>();
+    device_info_data->cbSize = sizeof(SP_DEVINFO_DATA);
+    for (int i=0; ::SetupDiEnumDeviceInfo(device_info, i, device_info_data.get()); i++) {
+      auto device_interface_data = sharedPtr<SP_DEVICE_INTERFACE_DATA>();
+      device_interface_data->cbSize = sizeof(SP_DEVICE_INTERFACE_DATA);
+      for (int j=0; ::SetupDiEnumDeviceInterfaces(device_info, device_info_data.get(), &guid, j, device_interface_data.get()); j++) {
+        DWORD required_size = 0;
+        if (!::SetupDiGetDeviceInterfaceDetailA(device_info, device_interface_data.get(), nullptr, 0, &required_size, nullptr) && GetLastError() != ERROR_INSUFFICIENT_BUFFER) {
+          continue;
+        }
+
+        auto device_detail_data = sharedPtr<SP_DEVICE_INTERFACE_DETAIL_DATA_A>(required_size);
+        device_detail_data->cbSize = sizeof(SP_DEVICE_INTERFACE_DETAIL_DATA_A);
+        if (!::SetupDiGetDeviceInterfaceDetailA(device_info, device_interface_data.get(), device_detail_data.get(), required_size, nullptr, device_info_data.get())) {
+          continue;
+        }
+
+        while (CM_Get_Parent(&instance, instance, 0) == CR_SUCCESS && instance != device_info_data->DevInst) {
+          ;
+        }
+        if (instance == device_info_data->DevInst) {
+          busnum = i + 1;
+          device_path = std::string(device_detail_data->DevicePath);
+          break;
+        }
+      }
+      if (!device_path.empty()) {
+        break;
+      }
+    }
+  }
+  ::SetupDiDestroyDeviceInfoList(device_info);
+  return device_path;
+}
+
+std::string getRootName(HANDLE handle) {
+  DWORD size = sizeof(USB_ROOT_HUB_NAME);
+  auto root_name_tmp = sharedPtr<USB_ROOT_HUB_NAME>();
+  if (!::DeviceIoControl(handle, IOCTL_USB_GET_ROOT_HUB_NAME, nullptr, 0, root_name_tmp.get(), size, &size, nullptr)) {
+    return "";
+  }
+
+  size = root_name_tmp->ActualLength;
+  auto root_name = sharedPtr<USB_ROOT_HUB_NAME>(size);
+  if (!::DeviceIoControl(handle, IOCTL_USB_GET_ROOT_HUB_NAME, nullptr, 0, root_name.get(), size, &size, nullptr)) {
+    return "";
+  }
+
+  std::wstring wstr(root_name->RootHubName);
+  return std::string(wstr.begin(), wstr.end());
+}
+
+std::string getPortNameFromFriendlyName(const std::string& friendly_name) {
+  std::smatch serial_port_match;
+  std::regex_match(friendly_name, serial_port_match, std::regex("^.*(COM\\d+).*$"));
+  if (serial_port_match.size() != 2) {
+    return "";
+  }
+  return std::string(serial_port_match[1]);
+}
+
+DWORD getPortPropertyValue(HDEVINFO &device_info_set, SP_DEVINFO_DATA &device_info_data, DWORD property) {
+  DWORD length = 0;
+  DWORD buffer = 0;
+  if (!::SetupDiGetDeviceRegistryProperty(device_info_set, &device_info_data, property, nullptr, reinterpret_cast<PBYTE>(&buffer), sizeof(buffer), &length)) {
+    return 0;
+  }
+  return buffer;
+}
+
+std::string getPortPropertyString(HDEVINFO &device_info_set, SP_DEVINFO_DATA &device_info_data, DWORD property) {
+  DWORD length = 0;
+  const DWORD max_length = 256;
+  TCHAR buffer[max_length] = {0};
+  if (!::SetupDiGetDeviceRegistryProperty(device_info_set, &device_info_data, property, nullptr, reinterpret_cast<PBYTE>(buffer), max_length, &length)) {
+    return "";
+  }
+  return std::string(buffer);
+}
+
+int getCOMPorts(std::map<std::string, DWORD> &serial_port_numbers, std::map<std::string, DWORD> &serial_port_instances) {
+  serial_port_numbers.clear();
+  serial_port_instances.clear();
+  HDEVINFO device_info = ::SetupDiGetClassDevs(&GUID_DEVINTERFACE_COMPORT, nullptr, nullptr, DIGCF_PRESENT | DIGCF_DEVICEINTERFACE);
+  if (device_info == INVALID_HANDLE_VALUE) {
+    return -1;
+  }
+
+  SP_DEVINFO_DATA device_info_data {.cbSize = sizeof(SP_DEVINFO_DATA)};
+  for (int i=0; ::SetupDiEnumDeviceInfo(device_info, i, &device_info_data); i++) {
+    DWORD port_number = getPortPropertyValue(device_info, device_info_data, SPDRP_ADDRESS);
+    std::string hardware_id = getPortPropertyString(device_info, device_info_data, SPDRP_HARDWAREID);  // only for debug
+    std::string friendly_name = getPortPropertyString(device_info, device_info_data, SPDRP_FRIENDLYNAME);
+    std::string serial_port_name = getPortNameFromFriendlyName(friendly_name);
+
+    serial_port_numbers.insert(std::make_pair(serial_port_name, port_number));
+    serial_port_instances.insert(std::make_pair(serial_port_name, device_info_data.DevInst));
+  }
+
+  ::SetupDiDestroyDeviceInfoList(device_info);
+  return serial_port_numbers.size();
+}
+
+int PortInfo::getPortInfo(const std::string &serial_port_name) {
+  std::map<std::string, DWORD> serial_port_numbers;
+  std::map<std::string, DWORD> serial_port_instances;
+  getCOMPorts(serial_port_numbers, serial_port_instances);
+  if (!serial_port_numbers.count(serial_port_name)) {
+    return -1;
+  }
+
+  DWORD bus_number = 0;
+  std::string device_path = getDevicePath(GUID_DEVINTERFACE_USB_HOST_CONTROLLER, serial_port_instances.at(serial_port_name), bus_number);
+  HANDLE device_handle = ::CreateFileA(device_path.c_str(), GENERIC_WRITE, FILE_SHARE_WRITE, nullptr, OPEN_EXISTING, 0, nullptr);
+  if (device_handle == INVALID_HANDLE_VALUE) {
+    return -1;
+  }
+  HANDLE root_handle = CreateFileA(escape(getRootName(device_handle)).c_str(), GENERIC_WRITE, FILE_SHARE_WRITE, nullptr, OPEN_EXISTING, 0, nullptr);
+  if (root_handle == INVALID_HANDLE_VALUE) {
+    ::CloseHandle(device_handle);
+    return -1;
+  }
+
+  USB_NODE_INFORMATION node_info{};
+  DWORD size = sizeof(node_info);
+  if (DeviceIoControl(root_handle, IOCTL_USB_GET_NODE_INFORMATION, &node_info, size, &node_info, size, &size, nullptr)) {
+    for (int port_number=1; port_number <= node_info.u.HubInformation.HubDescriptor.bNumberOfPorts; port_number++) {
+      auto connection_info = sharedPtr<USB_NODE_CONNECTION_INFORMATION_EX>();
+      connection_info->ConnectionIndex = port_number;
+      size = sizeof(*connection_info);
+      if (!DeviceIoControl(root_handle, IOCTL_USB_GET_NODE_CONNECTION_INFORMATION_EX, connection_info.get(), size, connection_info.get(), size, &size, nullptr)) {
+        continue;
+      }
+      if (connection_info->DeviceIsHub) {
+        continue;  //TODO: recurse on hub?
+      }
+      if (serial_port_numbers.at(serial_port_name) != connection_info->ConnectionIndex) {
+        continue;
+      }
+
+      busnum = bus_number;
+      devnum = connection_info->DeviceAddress + 1;
+      id_vendor = connection_info->DeviceDescriptor.idVendor;
+      id_product = connection_info->DeviceDescriptor.idProduct;
+      manufacturer = getDeviceDescriptor(root_handle, port_number, connection_info->DeviceDescriptor.iManufacturer);
+      product = getDeviceDescriptor(root_handle, port_number, connection_info->DeviceDescriptor.iProduct);
+      serial_number = getDeviceDescriptor(root_handle, port_number, connection_info->DeviceDescriptor.iSerialNumber);
+      serial_port = serial_port_name;
+      break;
+    }
+  }
+
+  ::CloseHandle(root_handle);
+  ::CloseHandle(device_handle);
+  return 0;
 }
 
 int serial::getPortsInfo(std::vector<PortInfo> &serial_ports) {
   serial_ports.clear();
-
-  HDEVINFO device_info_set = SetupDiGetClassDevs((const GUID *)&GUID_DEVCLASS_PORTS, nullptr, nullptr, DIGCF_PRESENT);
-  unsigned int device_info_set_index = 0;
-  SP_DEVINFO_DATA device_info_data;
-  device_info_data.cbSize = sizeof(SP_DEVINFO_DATA);
-
-  while (SetupDiEnumDeviceInfo(device_info_set, device_info_set_index, &device_info_data)) {
-    device_info_set_index++;
-
-    // Get port name
-    HKEY hkey = SetupDiOpenDevRegKey(device_info_set, &device_info_data, DICS_FLAG_GLOBAL, 0, DIREG_DEV, KEY_READ);
-    TCHAR port_name[port_name_max_length];
-    DWORD port_name_length = port_name_max_length;
-    LONG return_code = RegQueryValueEx(hkey, _T("PortName"), nullptr, nullptr, (LPBYTE)port_name, &port_name_length);
-    RegCloseKey(hkey);
-
-    if (return_code != EXIT_SUCCESS) {
-      continue;
-    }
-
-    if (port_name_length > 0 && port_name_length <= port_name_max_length) {
-      port_name[port_name_length - 1] = '\0';
-    } else {
-      port_name[0] = '\0';
-    }
-
-    // Ignore parallel ports
-    if (_tcsstr(port_name, _T("LPT")) != nullptr) {
-      continue;
-    }
-
-    // Get port friendly name
-    TCHAR friendly_name[friendly_name_max_length];
-    DWORD friendly_name_actual_length = 0;
-    BOOL got_friendly_name = SetupDiGetDeviceRegistryProperty(device_info_set, &device_info_data, SPDRP_FRIENDLYNAME,
-                                                              nullptr, (PBYTE)friendly_name, friendly_name_max_length,
-                                                              &friendly_name_actual_length);
-
-    if (got_friendly_name == TRUE && friendly_name_actual_length > 0) {
-      friendly_name[friendly_name_actual_length - 1] = '\0';
-    } else {
-      friendly_name[0] = '\0';
-    }
-
-    // Get hardware ID
-    TCHAR hardware_id[hardware_id_max_length];
-    DWORD hardware_id_actual_length = 0;
-    BOOL got_hardware_id = SetupDiGetDeviceRegistryProperty(device_info_set, &device_info_data, SPDRP_HARDWAREID, nullptr,
-                                                            (PBYTE)hardware_id, hardware_id_max_length,
-                                                            &hardware_id_actual_length);
-
-    if (got_hardware_id == TRUE && hardware_id_actual_length > 0) {
-      hardware_id[hardware_id_actual_length - 1] = '\0';
-    } else {
-      hardware_id[0] = '\0';
-    }
-
-#ifdef UNICODE
-    std::string portName = utf8_encode(port_name);
-    std::string friendlyName = utf8_encode(friendly_name);
-    std::string hardwareId = utf8_encode(hardware_id);
-#else
-    std::string portName = port_name;
-    std::string friendlyName = friendly_name;
-    std::string hardwareId = hardware_id;
-#endif
-
-    PortInfo port_info;
-    //FIXME
-    //port_info.id_product = get_int_property(parent, "idProduct");
-    //port_info.id_vendor = get_int_property(parent, "idVendor");
-    //port_info.manufacturer = rtrim(get_string_property(parent, "USB Vendor Name"));
-    //port_info.product = rtrim(get_string_property(parent, "USB Product Name"));
-    //port_info.serial_number = rtrim(get_string_property(parent, "USB Serial Number"));
-    port_info.serial_port = portName;
-    serial_ports.push_back(port_info);
+  std::vector<std::string> serial_port_names;
+  if (getPortsList(serial_port_names) < 0) {
+    return -1;
   }
-
-  SetupDiDestroyDeviceInfoList(device_info_set);
+  for (auto const &serial_port_name : serial_port_names) {
+    PortInfo serial_port;
+    if (!serial_port.getPortInfo(serial_port_name)) {
+      serial_ports.push_back(serial_port);
+    }
+  }
   return serial_ports.size();
 }
 
 int serial::getPortsList(std::vector<std::string> &serial_port_names) {
   serial_port_names.clear();
-
-  return 0;
+  std::map<std::string, DWORD> serial_port_numbers;
+  std::map<std::string, DWORD> serial_port_instances;
+  getCOMPorts(serial_port_numbers, serial_port_instances);
+  for (auto const& serial_port : serial_port_numbers) {
+    serial_port_names.push_back(serial_port.first);
+  }
+  return serial_port_names.size();
 }
 
 #endif // #if defined(_WIN32)

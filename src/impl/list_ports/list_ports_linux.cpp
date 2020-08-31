@@ -24,8 +24,6 @@
 
 #include <climits>
 #include <fstream>
-#include <iostream>
-#include <regex>
 
 #include <fcntl.h>
 #include <glob.h>
