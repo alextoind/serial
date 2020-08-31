@@ -36,6 +36,24 @@
 
 using namespace serial;
 
+int getLinkPath(std::string system_path, std::string &link_path) {
+  struct stat serial_port_stat{0};
+  if (::lstat(system_path.c_str(), &serial_port_stat) == -1) {
+    return -1;
+  }
+  if (!S_ISLNK(serial_port_stat.st_mode)) {
+    system_path += "/device";
+  }
+  char link_path_buf[PATH_MAX];
+  ssize_t link_length = ::readlink(system_path.c_str(), link_path_buf, sizeof(link_path_buf) - 1);
+  if (link_length == -1) {
+    return -1;
+  }
+  link_path_buf[link_length] = '\0';
+  link_path = std::string(link_path_buf);
+  return 0;
+}
+
 int PortInfo::getPortInfo(const std::string &serial_port_name) {
   std::smatch serial_port_match;
   std::regex_match(serial_port_name, serial_port_match, std::regex("^/dev/([^/]+)/?$"));
@@ -57,7 +75,7 @@ int PortInfo::getPortInfo(const std::string &serial_port_name) {
     for (int i=0; i<3; i++) {
       system_path += "/..";
       //FIXME: should check the existence at least for the first four files
-      struct stat serial_port_stat;
+      struct stat serial_port_stat{0};
       if (::stat((system_path + "/busnum").c_str(), &serial_port_stat) == -1) {
         continue;
       }
@@ -72,24 +90,6 @@ int PortInfo::getPortInfo(const std::string &serial_port_name) {
     }
   }
   serial_port = serial_port_name;
-  return 0;
-}
-
-int serial::getLinkPath(std::string system_path, std::string &link_path) {
-  struct stat serial_port_stat;
-  if (::lstat(system_path.c_str(), &serial_port_stat) == -1) {
-    return -1;
-  }
-  if (!S_ISLNK(serial_port_stat.st_mode)) {
-    system_path += "/device";
-  }
-  char link_path_buf[PATH_MAX];
-  ssize_t link_length = ::readlink(system_path.c_str(), link_path_buf, sizeof(link_path_buf) - 1);
-  if (link_length == -1) {
-    return -1;
-  }
-  link_path_buf[link_length] = '\0';
-  link_path = std::string(link_path_buf);
   return 0;
 }
 
@@ -134,7 +134,7 @@ int serial::getPortsList(std::vector<std::string> &serial_port_names) {
       if (file_descriptor < 0) {
         continue;
       }
-      struct serial_struct serial_info;
+      struct serial_struct serial_info{0};
       if (::ioctl(file_descriptor, TIOCGSERIAL, &serial_info) || serial_info.type == PORT_UNKNOWN) {
         ::close(file_descriptor);
         continue;
