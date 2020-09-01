@@ -23,12 +23,12 @@
 #define SERIAL_H
 
 #include <chrono>
-#include <cstring>
-#include <limits>
+#include <map>
 #include <memory>
 #include <mutex>
-#include <sstream>
+#include <regex>
 #include <string>
+#include <thread>
 #include <vector>
 
 namespace serial {
@@ -698,14 +698,9 @@ class PortInfo {
   std::string product;
   std::string serial_number;
 
-#if defined(__linux__)
   int getPortInfo(const std::string &serial_port_name);
-#endif
 };
 
-#if defined(__linux__)
-int getLinkPath(std::string system_path, std::string &link_path);
-#endif
 int getPortsInfo(std::vector<PortInfo> &serial_ports);
 int getPortsList(std::vector<std::string> &serial_port_names);
 } // namespace serial

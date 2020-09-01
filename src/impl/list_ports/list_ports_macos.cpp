@@ -29,11 +29,7 @@
 #include <IOKit/serial/IOSerialKeys.h>
 #include <IOKit/IOBSD.h>
 
-#include <iostream>
-#include <string>
-#include <vector>
-
-#include "serial/serial.h"
+#include <serial/serial.h>
 
 using namespace serial;
 
@@ -178,6 +174,11 @@ std::string rtrim(const std::string &str) {
   return result;
 }
 
+int PortInfo::getPortInfo(const std::string &serial_port_name) {
+  //TODO
+  return 0;
+}
+
 int serial::getPortsInfo(std::vector<PortInfo> &serial_ports) {
   serial_ports.clear();
 
@@ -226,9 +227,9 @@ int serial::getPortsInfo(std::vector<PortInfo> &serial_ports) {
   return serial_ports.size();
 }
 
-int getPortsList(std::vector<std::string> &serial_port_names) {
+int serial::getPortsList(std::vector<std::string> &serial_port_names) {
   serial_port_names.clear();
-
+  //TODO
   return 0;
 }
 

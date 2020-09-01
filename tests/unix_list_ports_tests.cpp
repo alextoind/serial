@@ -72,6 +72,53 @@ TEST(ListSerialPorts, PortInfo) {
     ASSERT_EQ(serial_port.serial_port, "");
   }
 }
+#elif defined(_WIN32)
+TEST(ListSerialPorts, PortsList) {
+  std::vector<std::string> serial_port_names;
+  int serial_port_names_retrieved = getPortsList(serial_port_names);
+  ASSERT_GE(serial_port_names_retrieved, 0);
+  ASSERT_EQ(serial_port_names.size(), serial_port_names_retrieved);
+  for (auto const &serial_port_name : serial_port_names) {
+    EXPECT_THAT(serial_port_name, ::testing::MatchesRegex("^COM\\d+$"));
+  }
+}
+
+TEST(ListSerialPorts, PortsInfo) {
+  std::vector<PortInfo> serial_ports;
+  int serial_ports_retrieved = getPortsInfo(serial_ports);
+  ASSERT_GE(serial_ports_retrieved, 0);
+  ASSERT_EQ(serial_ports.size(), serial_ports_retrieved);
+  for (auto const &serial_port : serial_ports) {
+    ASSERT_THAT(serial_port.serial_port, ::testing::MatchesRegex("^COM\\d+$"));
+  }
+}
+TEST(ListSerialPorts, PortInfo) {
+  PortInfo serial_port;
+  if (!serial_port.getPortInfo("COM3")) {  //TODO: this should be device agnostic
+    EXPECT_GE(serial_port.busnum, 0);
+    EXPECT_LE(serial_port.busnum, 65535);
+    EXPECT_GE(serial_port.devnum, 0);
+    EXPECT_LE(serial_port.devnum, 65535);
+    EXPECT_GE(serial_port.id_product, 0);  // MSVC does not support [] and {} in regex
+    EXPECT_LE(serial_port.id_product, 65535);
+    EXPECT_GE(serial_port.id_vendor, 0);  // MSVC does not support [] and {} in regex
+    EXPECT_LE(serial_port.id_vendor, 65535);
+    EXPECT_EQ(serial_port.manufacturer, "QB Robotics");
+    EXPECT_THAT(serial_port.product, ::testing::MatchesRegex("^\\w+ \\d+$"));  // MSVC does not support [] and {} in regex
+    EXPECT_THAT(serial_port.product, ::testing::EndsWith(serial_port.serial_number));
+    EXPECT_THAT(serial_port.serial_number, ::testing::MatchesRegex("\\d+"));
+    ASSERT_EQ(serial_port.serial_port, "COM3");
+  } else {
+    ASSERT_EQ(serial_port.busnum, 0);
+    ASSERT_EQ(serial_port.devnum, 0);
+    ASSERT_EQ(serial_port.id_product, 0);
+    ASSERT_EQ(serial_port.id_vendor, 0);
+    ASSERT_EQ(serial_port.manufacturer, "");
+    ASSERT_EQ(serial_port.product, "");
+    ASSERT_EQ(serial_port.serial_number, "");
+    ASSERT_EQ(serial_port.serial_port, "");
+  }
+}
 #endif
 
 TEST(DummyTests, Dummy) {
