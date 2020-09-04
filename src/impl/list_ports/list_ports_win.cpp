@@ -71,7 +71,7 @@ std::string getDeviceDescriptor(HANDLE handle, DWORD connection_index, UCHAR des
 
 std::string getDevicePath(const GUID &guid, DEVINST instance, DWORD &busnum) {
   std::string device_path;
-  HDEVINFO device_info = ::SetupDiGetClassDevsW(&guid, nullptr, nullptr, DIGCF_PRESENT | DIGCF_DEVICEINTERFACE);
+  HDEVINFO device_info = ::SetupDiGetClassDevsA(&guid, nullptr, nullptr, DIGCF_PRESENT | DIGCF_DEVICEINTERFACE);
   if (device_info != INVALID_HANDLE_VALUE) {
     auto device_info_data = sharedPtr<SP_DEVINFO_DATA>();
     device_info_data->cbSize = sizeof(SP_DEVINFO_DATA);
@@ -90,7 +90,7 @@ std::string getDevicePath(const GUID &guid, DEVINST instance, DWORD &busnum) {
           continue;
         }
 
-        while (CM_Get_Parent(&instance, instance, 0) == CR_SUCCESS && instance != device_info_data->DevInst) {
+        while (::CM_Get_Parent(&instance, instance, 0) == CR_SUCCESS && instance != device_info_data->DevInst) {
           ;
         }
         if (instance == device_info_data->DevInst) {
@@ -106,6 +106,25 @@ std::string getDevicePath(const GUID &guid, DEVINST instance, DWORD &busnum) {
   }
   ::SetupDiDestroyDeviceInfoList(device_info);
   return device_path;
+}
+
+std::string getHubName(HANDLE handle, DWORD connection_index) {
+  DWORD size = sizeof(USB_NODE_CONNECTION_NAME);
+  auto hub_name_tmp = sharedPtr<USB_NODE_CONNECTION_NAME>();
+  hub_name_tmp->ConnectionIndex = connection_index;
+  if (!::DeviceIoControl(handle, IOCTL_USB_GET_NODE_CONNECTION_NAME, hub_name_tmp.get(), size, hub_name_tmp.get(), size, &size, nullptr)) {
+    return "";
+  }
+
+  size = hub_name_tmp->ActualLength;
+  auto hub_name = sharedPtr<USB_NODE_CONNECTION_NAME>(size);
+  hub_name->ConnectionIndex = connection_index;
+  if (!::DeviceIoControl(handle, IOCTL_USB_GET_NODE_CONNECTION_NAME, hub_name.get(), size, hub_name.get(), size, &size, nullptr)) {
+    return "";
+  }
+
+  std::wstring wstr(hub_name->NodeName);
+  return std::string(wstr.begin(), wstr.end());
 }
 
 std::string getRootName(HANDLE handle) {
@@ -137,7 +156,7 @@ std::string getPortNameFromFriendlyName(const std::string& friendly_name) {
 DWORD getPortPropertyValue(HDEVINFO &device_info_set, SP_DEVINFO_DATA &device_info_data, DWORD property) {
   DWORD length = 0;
   DWORD buffer = 0;
-  if (!::SetupDiGetDeviceRegistryProperty(device_info_set, &device_info_data, property, nullptr, reinterpret_cast<PBYTE>(&buffer), sizeof(buffer), &length)) {
+  if (!::SetupDiGetDeviceRegistryPropertyA(device_info_set, &device_info_data, property, nullptr, reinterpret_cast<PBYTE>(&buffer), sizeof(buffer), &length)) {
     return 0;
   }
   return buffer;
@@ -147,7 +166,7 @@ std::string getPortPropertyString(HDEVINFO &device_info_set, SP_DEVINFO_DATA &de
   DWORD length = 0;
   const DWORD max_length = 256;
   TCHAR buffer[max_length] = {0};
-  if (!::SetupDiGetDeviceRegistryProperty(device_info_set, &device_info_data, property, nullptr, reinterpret_cast<PBYTE>(buffer), max_length, &length)) {
+  if (!::SetupDiGetDeviceRegistryPropertyA(device_info_set, &device_info_data, property, nullptr, reinterpret_cast<PBYTE>(buffer), max_length, &length)) {
     return "";
   }
   return std::string(buffer);
@@ -156,7 +175,7 @@ std::string getPortPropertyString(HDEVINFO &device_info_set, SP_DEVINFO_DATA &de
 int getCOMPorts(std::map<std::string, DWORD> &serial_port_numbers, std::map<std::string, DWORD> &serial_port_instances) {
   serial_port_numbers.clear();
   serial_port_instances.clear();
-  HDEVINFO device_info = ::SetupDiGetClassDevs(&GUID_DEVINTERFACE_COMPORT, nullptr, nullptr, DIGCF_PRESENT | DIGCF_DEVICEINTERFACE);
+  HDEVINFO device_info = ::SetupDiGetClassDevsA(&GUID_DEVINTERFACE_COMPORT, nullptr, nullptr, DIGCF_PRESENT | DIGCF_DEVICEINTERFACE);
   if (device_info == INVALID_HANDLE_VALUE) {
     return -1;
   }
@@ -176,6 +195,42 @@ int getCOMPorts(std::map<std::string, DWORD> &serial_port_numbers, std::map<std:
   return serial_port_numbers.size();
 }
 
+int getInfo(HANDLE handle, DWORD serial_port_number, HANDLE &handle_found, std::shared_ptr<USB_NODE_CONNECTION_INFORMATION_EX> &connection_info_found) {
+  USB_NODE_INFORMATION node_info{};
+  DWORD size = sizeof(node_info);
+  if (::DeviceIoControl(handle, IOCTL_USB_GET_NODE_INFORMATION, &node_info, size, &node_info, size, &size, nullptr)) {
+    for (int port_number=1; port_number <= node_info.u.HubInformation.HubDescriptor.bNumberOfPorts; port_number++) {
+      auto connection_info = sharedPtr<USB_NODE_CONNECTION_INFORMATION_EX>();
+      connection_info->ConnectionIndex = port_number;
+      size = sizeof(*connection_info);
+      if (!::DeviceIoControl(handle, IOCTL_USB_GET_NODE_CONNECTION_INFORMATION_EX, connection_info.get(), size, connection_info.get(), size, &size, nullptr)) {
+        continue;
+      }
+      if (connection_info->DeviceIsHub) {
+        HANDLE hub_handle = ::CreateFileA(escape(getHubName(handle, connection_info->ConnectionIndex)).c_str(), GENERIC_WRITE, FILE_SHARE_WRITE, nullptr, OPEN_EXISTING, 0, nullptr);
+        if (hub_handle == INVALID_HANDLE_VALUE) {
+          continue;
+        }
+        if (getInfo(hub_handle, serial_port_number, handle_found, connection_info_found)) {
+          ::CloseHandle(hub_handle);
+          continue;
+        }
+        return 0;
+      }
+      if (connection_info->ConnectionIndex != serial_port_number) {
+        continue;
+      }
+
+      handle_found = handle;
+      connection_info_found = connection_info;
+      return 0;
+    }
+  }
+  handle_found = INVALID_HANDLE_VALUE;
+  connection_info_found = nullptr;
+  return -1;
+}
+
 int PortInfo::getPortInfo(const std::string &serial_port_name) {
   std::map<std::string, DWORD> serial_port_numbers;
   std::map<std::string, DWORD> serial_port_instances;
@@ -190,39 +245,24 @@ int PortInfo::getPortInfo(const std::string &serial_port_name) {
   if (device_handle == INVALID_HANDLE_VALUE) {
     return -1;
   }
-  HANDLE root_handle = CreateFileA(escape(getRootName(device_handle)).c_str(), GENERIC_WRITE, FILE_SHARE_WRITE, nullptr, OPEN_EXISTING, 0, nullptr);
+  HANDLE root_handle = ::CreateFileA(escape(getRootName(device_handle)).c_str(), GENERIC_WRITE, FILE_SHARE_WRITE, nullptr, OPEN_EXISTING, 0, nullptr);
   if (root_handle == INVALID_HANDLE_VALUE) {
     ::CloseHandle(device_handle);
     return -1;
   }
 
-  USB_NODE_INFORMATION node_info{};
-  DWORD size = sizeof(node_info);
-  if (DeviceIoControl(root_handle, IOCTL_USB_GET_NODE_INFORMATION, &node_info, size, &node_info, size, &size, nullptr)) {
-    for (int port_number=1; port_number <= node_info.u.HubInformation.HubDescriptor.bNumberOfPorts; port_number++) {
-      auto connection_info = sharedPtr<USB_NODE_CONNECTION_INFORMATION_EX>();
-      connection_info->ConnectionIndex = port_number;
-      size = sizeof(*connection_info);
-      if (!DeviceIoControl(root_handle, IOCTL_USB_GET_NODE_CONNECTION_INFORMATION_EX, connection_info.get(), size, connection_info.get(), size, &size, nullptr)) {
-        continue;
-      }
-      if (connection_info->DeviceIsHub) {
-        continue;  //TODO: recurse on hub?
-      }
-      if (serial_port_numbers.at(serial_port_name) != connection_info->ConnectionIndex) {
-        continue;
-      }
-
-      busnum = bus_number;
-      devnum = connection_info->DeviceAddress + 1;
-      id_vendor = connection_info->DeviceDescriptor.idVendor;
-      id_product = connection_info->DeviceDescriptor.idProduct;
-      manufacturer = getDeviceDescriptor(root_handle, port_number, connection_info->DeviceDescriptor.iManufacturer);
-      product = getDeviceDescriptor(root_handle, port_number, connection_info->DeviceDescriptor.iProduct);
-      serial_number = getDeviceDescriptor(root_handle, port_number, connection_info->DeviceDescriptor.iSerialNumber);
-      serial_port = serial_port_name;
-      break;
-    }
+  HANDLE handle_found = INVALID_HANDLE_VALUE;
+  auto connection_info_found = sharedPtr<USB_NODE_CONNECTION_INFORMATION_EX>();
+  if (!getInfo(root_handle, serial_port_numbers.at(serial_port_name), handle_found, connection_info_found)) {
+    busnum = bus_number;
+    devnum = connection_info_found->DeviceAddress + 1;
+    id_vendor = connection_info_found->DeviceDescriptor.idVendor;
+    id_product = connection_info_found->DeviceDescriptor.idProduct;
+    manufacturer = getDeviceDescriptor(handle_found, serial_port_numbers.at(serial_port_name), connection_info_found->DeviceDescriptor.iManufacturer);
+    product = getDeviceDescriptor(handle_found, serial_port_numbers.at(serial_port_name), connection_info_found->DeviceDescriptor.iProduct);
+    serial_number = getDeviceDescriptor(handle_found, serial_port_numbers.at(serial_port_name), connection_info_found->DeviceDescriptor.iSerialNumber);
+    serial_port = serial_port_name;
+    ::CloseHandle(handle_found);
   }
 
   ::CloseHandle(root_handle);
