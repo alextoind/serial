@@ -261,7 +261,9 @@ int PortInfo::getPortInfo(const std::string &serial_port_name) {
     ::CloseHandle(handle_found);
   }
 
-  ::CloseHandle(root_handle);
+  if (handle_found != root_handle) {
+    ::CloseHandle(root_handle);
+  }
   ::CloseHandle(device_handle);
   return 0;
 }
