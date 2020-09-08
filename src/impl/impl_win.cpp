@@ -25,15 +25,6 @@
 
 using namespace serial;
 
-std::string escape(const std::string &str) {
-  std::smatch match;
-  std::regex_search(str, match, std::regex(R"(^\\\\.\\)"));
-  if (match.empty()) {
-    return R"(\\.\)" + str;
-  }
-  return str;
-}
-
 Serial::SerialImpl::SerialImpl(std::string port, unsigned long baudrate, Timeout timeout, bytesize_t bytesize,
                                parity_t parity, stopbits_t stopbits, flowcontrol_t flowcontrol)
     : port_(std::move(port)),
