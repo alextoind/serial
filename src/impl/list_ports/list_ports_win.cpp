@@ -30,13 +30,9 @@
 #include <usbioctl.h>
 #include <usbiodef.h>
 
-#include <serial/serial.h>
+#include <serial/impl/impl.h>
 
 using namespace serial;
-
-std::string escape(const std::string &str) {
-  return R"(\\.\)" + str;
-}
 
 template <typename T>
 std::shared_ptr<T> sharedPtr(size_t size = 0) {

@@ -55,6 +55,17 @@
 
 namespace serial {
 
+#if defined(_WIN32)
+inline std::string escape(const std::string &str) {
+  std::smatch match;
+  std::regex_search(str, match, std::regex(R"(^\\\\.\\)"));
+  if (match.empty()) {
+    return R"(\\.\)" + str;
+  }
+  return str;
+}
+#endif
+
 class Serial::SerialImpl {
  public:
   SerialImpl(std::string port, unsigned long baudrate, Timeout timeout, bytesize_t bytesize, parity_t parity,

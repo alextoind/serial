@@ -25,14 +25,6 @@
 
 using namespace serial;
 
-inline std::wstring _prefix_port_if_needed(const std::wstring &input) {
-  static std::wstring windows_com_port_prefix = L"\\\\.\\";
-  if (input.compare(windows_com_port_prefix) != 0) {
-    return windows_com_port_prefix + input;
-  }
-  return input;
-}
-
 Serial::SerialImpl::SerialImpl(std::string port, unsigned long baudrate, Timeout timeout, bytesize_t bytesize,
                                parity_t parity, stopbits_t stopbits, flowcontrol_t flowcontrol)
     : port_(std::move(port)),
@@ -61,10 +53,8 @@ void Serial::SerialImpl::open() {
     return;
   }
 
-  // See: https://github.com/wjwwood/serial/issues/84
-  std::wstring port_with_prefix = _prefix_port_if_needed(std::wstring(port_.begin(), port_.end()));
-  LPCWSTR lp_port = port_with_prefix.c_str();
-  fd_ = ::CreateFileW(lp_port, GENERIC_READ | GENERIC_WRITE, 0, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr);
+  std::string escaped_port = escape(port_);
+  fd_ = ::CreateFileW(std::wstring(escaped_port.begin(), escaped_port.end()).c_str(), GENERIC_READ | GENERIC_WRITE, 0, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr);
   if (fd_ == INVALID_HANDLE_VALUE) {
     throw SerialIOException("failure during ::CreateFileW()", ::GetLastError());
   }
