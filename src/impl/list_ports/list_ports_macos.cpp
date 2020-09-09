@@ -21,216 +21,148 @@
 
 #if defined(__APPLE__)
 
-#include <sys/param.h>
-#include <stdint.h>
-
 #include <CoreFoundation/CoreFoundation.h>
 #include <IOKit/IOKitLib.h>
 #include <IOKit/serial/IOSerialKeys.h>
-#include <IOKit/IOBSD.h>
 
 #include <serial/serial.h>
 
 using namespace serial;
 
-#define HARDWARE_ID_STRING_LENGTH 128
-
-std::string cfstring_to_string(CFStringRef cfstring);
-std::string get_device_path(io_object_t &serial_port);
-std::string get_class_name(io_object_t &obj);
-io_registry_entry_t get_parent_iousb_device(io_object_t &serial_port);
-std::string get_string_property(io_object_t &device, const char *property);
-uint16_t get_int_property(io_object_t &device, const char *property);
-std::string rtrim(const std::string &str);
-
-std::string cfstring_to_string(CFStringRef cfstring) {
-  char cstring[MAXPATHLEN];
-  std::string result;
-
-  if (cfstring) {
-    Boolean success = CFStringGetCString(cfstring, cstring, sizeof(cstring), kCFStringEncodingASCII);
-    if (success) {
-      result = cstring;
-    }
+int toInt(CFNumberRef cf_num) {
+  int num;
+  if (cf_num && ::CFNumberGetValue(cf_num, kCFNumberIntType, &num)) {
+    return num;
   }
-
-  return result;
+  return 0;
 }
 
-std::string get_device_path(io_object_t &serial_port) {
-  CFTypeRef callout_path;
-  std::string device_path;
-  callout_path = IORegistryEntryCreateCFProperty(serial_port, CFSTR(kIOCalloutDeviceKey), kCFAllocatorDefault, 0);
-
-  if (callout_path) {
-    if (CFGetTypeID(callout_path) == CFStringGetTypeID()) {
-      device_path = cfstring_to_string(static_cast<CFStringRef>(callout_path));
-    }
-
-    CFRelease(callout_path);
+std::string toString(CFStringRef cf_str) {
+  char str[PATH_MAX] = {};
+  if (cf_str && ::CFStringGetCString(cf_str, str, sizeof(str), kCFStringEncodingASCII)) {
+    return std::string(str);
   }
+  return "";
+}
 
+std::string getDevicePath(const io_object_t &serial_port_obj) {
+  CFTypeRef path = ::IORegistryEntryCreateCFProperty(serial_port_obj, CFSTR(kIOCalloutDeviceKey), kCFAllocatorDefault, 0);
+  std::string device_path = toString(reinterpret_cast<CFStringRef>(path));
+  if (path) {
+    ::CFRelease(path);
+  }
   return device_path;
 }
 
-std::string get_class_name(io_object_t &obj) {
-  std::string result;
+std::string getPortPropertyString(const io_object_t &serial_port_obj, const std::string &property_name) {
+  CFStringRef cf_property_name = ::CFStringCreateWithCString(kCFAllocatorDefault, property_name.c_str(), kCFStringEncodingASCII);
+  CFTypeRef cf_property = ::IORegistryEntrySearchCFProperty(serial_port_obj, kIOServicePlane, cf_property_name, kCFAllocatorDefault, kIORegistryIterateRecursively | kIORegistryIterateParents);
+  std::string property_value = toString(reinterpret_cast<CFStringRef>(cf_property));
+  if (cf_property) {
+    ::CFRelease(cf_property);
+  }
+  return property_value;
+}
+
+uint16_t getPortPropertyValue(const io_object_t &serial_port_obj, const std::string &property_name) {
+  CFStringRef cf_property_name = ::CFStringCreateWithCString(kCFAllocatorDefault, property_name.c_str(), kCFStringEncodingASCII);
+  CFTypeRef cf_property = ::IORegistryEntrySearchCFProperty(serial_port_obj, kIOServicePlane, cf_property_name, kCFAllocatorDefault, kIORegistryIterateRecursively | kIORegistryIterateParents);
+  int property_value = toInt(reinterpret_cast<CFNumberRef>(cf_property));
+  if (cf_property) {
+    ::CFRelease(cf_property);
+  }
+  return property_value;
+}
+
+std::string getClassName(const io_object_t &device_obj) {
   io_name_t class_name;
-  kern_return_t kern_result;
-  kern_result = IOObjectGetClass(obj, class_name);
-
-  if (kern_result == KERN_SUCCESS) {
-    result = class_name;
-  }
-
-  return result;
+  return ::IOObjectGetClass(device_obj, class_name) == KERN_SUCCESS ? class_name : "";
 }
 
-io_registry_entry_t get_parent_iousb_device(io_object_t &serial_port) {
-  io_object_t device = serial_port;
-  io_registry_entry_t parent = 0;
-  io_registry_entry_t result = 0;
-  kern_return_t kern_result = KERN_FAILURE;
-  std::string name = get_class_name(device);
-
-  // Walk the IO Registry tree looking for this devices parent IOUSBDevice.
-  while (name != "IOUSBDevice") {
-    kern_result = IORegistryEntryGetParentEntry(device, kIOServicePlane, &parent);
-
-    if (kern_result != KERN_SUCCESS) {
-      result = 0;
-      break;
-    }
-
-    device = parent;
-    name = get_class_name(device);
-  }
-
-  if (kern_result == KERN_SUCCESS) {
-    result = device;
-  }
-
-  return result;
-}
-
-std::string get_string_property(io_object_t &device, const char *property) {
-  std::string property_name;
-
-  if (device) {
-    CFStringRef property_as_cfstring = CFStringCreateWithCString(kCFAllocatorDefault, property, kCFStringEncodingASCII);
-    CFTypeRef name_as_cfstring = IORegistryEntryCreateCFProperty(device, property_as_cfstring, kCFAllocatorDefault, 0);
-
-    if (name_as_cfstring) {
-      if (CFGetTypeID(name_as_cfstring) == CFStringGetTypeID()) {
-        property_name = cfstring_to_string(static_cast<CFStringRef>(name_as_cfstring));
-      }
-      CFRelease(name_as_cfstring);
-    }
-
-    if (property_as_cfstring) {
-      CFRelease(property_as_cfstring);
+io_registry_entry_t getParent(io_object_t &serial_port_obj) {
+  io_object_t parent = serial_port_obj;
+  while (getClassName(parent) != "IOUSBDevice") {
+    if (::IORegistryEntryGetParentEntry(parent, kIOServicePlane, &parent) != KERN_SUCCESS) {
+      return 0;
     }
   }
-
-  return property_name;
-}
-
-uint16_t get_int_property(io_object_t &device, const char *property) {
-  uint16_t result = 0;
-
-  if (device) {
-    CFStringRef property_as_cfstring = CFStringCreateWithCString(kCFAllocatorDefault, property, kCFStringEncodingASCII);
-    CFTypeRef number = IORegistryEntryCreateCFProperty(device, property_as_cfstring, kCFAllocatorDefault, 0);
-
-    if (property_as_cfstring) {
-      CFRelease(property_as_cfstring);
-    }
-
-    if (number) {
-      if (CFGetTypeID(number) == CFNumberGetTypeID()) {
-        bool success = CFNumberGetValue(static_cast<CFNumberRef>(number), kCFNumberSInt16Type, &result);
-        if (!success) {
-          result = 0;
-        }
-      }
-      CFRelease(number);
-    }
-  }
-
-  return result;
-}
-
-std::string rtrim(const std::string &str) {
-  std::string result = str;
-  std::string whitespace = " \t\f\v\n\r";
-  std::size_t found = result.find_last_not_of(whitespace);
-
-  if (found != std::string::npos) {
-    result.erase(found + 1);
-  } else {
-    result.clear();
-  }
-
-  return result;
+  return parent;
 }
 
 int PortInfo::getPortInfo(const std::string &serial_port_name) {
-  //TODO
+  CFMutableDictionaryRef classes;
+  if (!(classes = ::IOServiceMatching(kIOSerialBSDServiceValue))) {
+    return -1;
+  }
+
+  io_iterator_t serial_port_iterator;
+  if (::IOServiceGetMatchingServices(kIOMasterPortDefault, classes, &serial_port_iterator) != KERN_SUCCESS) {
+    return -1;
+  }
+
+  io_object_t serial_port_obj;
+  while ((serial_port_obj = ::IOIteratorNext(serial_port_iterator))) {
+    std::string serial_port_name_found = getDevicePath(serial_port_obj);
+    if (serial_port_name_found != serial_port_name) {
+      continue;
+    }
+    serial_port = serial_port_name_found;
+
+    io_registry_entry_t parent = getParent(serial_port_obj);
+    if (parent == 0) {
+      continue;
+    }
+    ::IOObjectRelease(parent);
+
+    devnum = getPortPropertyValue(serial_port_obj, "USB Address");
+    id_product = getPortPropertyValue(serial_port_obj, "idProduct");
+    id_vendor = getPortPropertyValue(serial_port_obj, "idVendor");
+    manufacturer = getPortPropertyString(serial_port_obj, "USB Vendor Name");
+    product = getPortPropertyString(serial_port_obj, "USB Product Name");
+    serial_number = getPortPropertyString(serial_port_obj, "USB Serial Number");
+    ::IOObjectRelease(serial_port_obj);
+  }
+
+  ::IOObjectRelease(serial_port_iterator);
   return 0;
 }
 
 int serial::getPortsInfo(std::vector<PortInfo> &serial_ports) {
   serial_ports.clear();
-
-  CFMutableDictionaryRef classes_to_match;
-  io_iterator_t serial_port_iterator;
-  io_object_t serial_port;
-  mach_port_t master_port;
-  kern_return_t kern_result;
-  kern_result = IOMasterPort(MACH_PORT_NULL, &master_port);
-
-  if (kern_result != KERN_SUCCESS) {
+  std::vector<std::string> serial_port_names;
+  if (getPortsList(serial_port_names) < 0) {
     return -1;
   }
-
-  classes_to_match = IOServiceMatching(kIOSerialBSDServiceValue);
-  if (classes_to_match == NULL) {
-    return -1;
-  }
-
-  CFDictionarySetValue(classes_to_match, CFSTR(kIOSerialBSDTypeKey), CFSTR(kIOSerialBSDAllTypes));
-  kern_result = IOServiceGetMatchingServices(master_port, classes_to_match, &serial_port_iterator);
-  if (KERN_SUCCESS != kern_result) {
-    return -1;
-  }
-
-  while ((serial_port = IOIteratorNext(serial_port_iterator))) {
-    std::string device_path = get_device_path(serial_port);
-    io_registry_entry_t parent = get_parent_iousb_device(serial_port);
-    IOObjectRelease(serial_port);
-
-    if (device_path.empty()) {
-      continue;
+  for (auto const &serial_port_name : serial_port_names) {
+    PortInfo serial_port;
+    if (!serial_port.getPortInfo(serial_port_name)) {
+      serial_ports.push_back(serial_port);
     }
-
-    PortInfo port_info;
-    port_info.id_product = get_int_property(parent, "idProduct");
-    port_info.id_vendor = get_int_property(parent, "idVendor");
-    port_info.manufacturer = rtrim(get_string_property(parent, "USB Vendor Name"));
-    port_info.product = rtrim(get_string_property(parent, "USB Product Name"));
-    port_info.serial_number = rtrim(get_string_property(parent, "USB Serial Number"));
-    port_info.serial_port = device_path;
-    serial_ports.push_back(port_info);
   }
-
-  IOObjectRelease(serial_port_iterator);
   return serial_ports.size();
 }
 
 int serial::getPortsList(std::vector<std::string> &serial_port_names) {
   serial_port_names.clear();
-  //TODO
-  return 0;
+
+  CFMutableDictionaryRef classes;
+  if (!(classes = ::IOServiceMatching(kIOSerialBSDServiceValue))) {
+    return -1;
+  }
+
+  io_iterator_t serial_port_iterator;
+  if (::IOServiceGetMatchingServices(kIOMasterPortDefault, classes, &serial_port_iterator) != KERN_SUCCESS) {
+    return -1;
+  }
+
+  io_object_t serial_port_obj;
+  while ((serial_port_obj = ::IOIteratorNext(serial_port_iterator))) {
+    serial_port_names.push_back(getDevicePath(serial_port_obj));
+    ::IOObjectRelease(serial_port_obj);
+  }
+
+  ::IOObjectRelease(serial_port_iterator);
+  return serial_port_names.size();
 }
 
 #endif // defined(__APPLE__)
