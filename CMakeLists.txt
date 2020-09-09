@@ -156,20 +156,20 @@ add_test(NAME unix_timer_tests
   COMMAND unix_timer_tests
 )
 
-add_executable(unix_list_ports_tests
-  tests/unix_list_ports_tests.cpp
+add_executable(list_ports_tests
+  tests/list_ports_tests.cpp
 )
-target_link_libraries(unix_list_ports_tests PRIVATE
+target_link_libraries(list_ports_tests PRIVATE
   Serial::Serial
   GTest::gtest
   GTest::gmock
   GTest::gtest_main
 )
-set_target_properties(unix_list_ports_tests PROPERTIES
+set_target_properties(list_ports_tests PROPERTIES
   CXX_STANDARD 11
   CXX_STANDARD_REQUIRED ON
   CXX_EXTENSIONS NO
 )
-add_test(NAME unix_list_ports_tests
-  COMMAND unix_list_ports_tests
+add_test(NAME list_ports_tests
+  COMMAND list_ports_tests
 )
