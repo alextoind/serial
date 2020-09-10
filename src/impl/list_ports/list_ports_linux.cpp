@@ -81,8 +81,8 @@ int PortInfo::getPortInfo(const std::string &serial_port_name) {
       }
       std::ifstream(system_path + "/busnum") >> busnum;
       std::ifstream(system_path + "/devnum") >> devnum;
-      std::ifstream(system_path + "/idProduct") >> id_product;
-      std::ifstream(system_path + "/idVendor") >> id_vendor;
+      std::ifstream(system_path + "/idProduct") >> std::hex >> id_product;
+      std::ifstream(system_path + "/idVendor") >> std::hex >> id_vendor;
       std::getline(std::ifstream(system_path + "/manufacturer"), manufacturer);
       std::getline(std::ifstream(system_path + "/product"), product);
       std::getline(std::ifstream(system_path + "/serial"), serial_number);
