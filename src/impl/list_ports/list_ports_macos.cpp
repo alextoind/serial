@@ -124,7 +124,7 @@ int PortInfo::getPortInfo(const std::string &serial_port_name) {
   }
 
   ::IOObjectRelease(serial_port_iterator);
-  return 0;
+  return serial_port != serial_port_name ? -1 : 0;
 }
 
 int serial::getPortsInfo(std::vector<PortInfo> &serial_ports) {

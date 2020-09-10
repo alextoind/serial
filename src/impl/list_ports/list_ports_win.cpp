@@ -257,7 +257,6 @@ int PortInfo::getPortInfo(const std::string &serial_port_name) {
     manufacturer = getDeviceDescriptor(handle_found, serial_port_numbers.at(serial_port_name), connection_info_found->DeviceDescriptor.iManufacturer);
     product = getDeviceDescriptor(handle_found, serial_port_numbers.at(serial_port_name), connection_info_found->DeviceDescriptor.iProduct);
     serial_number = getDeviceDescriptor(handle_found, serial_port_numbers.at(serial_port_name), connection_info_found->DeviceDescriptor.iSerialNumber);
-    serial_port = serial_port_name;
     ::CloseHandle(handle_found);
   }
 
@@ -265,6 +264,7 @@ int PortInfo::getPortInfo(const std::string &serial_port_name) {
     ::CloseHandle(root_handle);
   }
   ::CloseHandle(device_handle);
+  serial_port = serial_port_name;
   return 0;
 }
 

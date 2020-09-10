@@ -46,6 +46,9 @@ TEST(ListSerialPorts, PortsInfo) {
   ASSERT_GE(serial_ports_retrieved, 0);
   ASSERT_EQ(serial_ports.size(), serial_ports_retrieved);
   for (auto const &serial_port : serial_ports) {
+    if (!serial_port.id_vendor) {
+      continue;
+    }
 #if defined(_WIN32)
     EXPECT_THAT(serial_port.serial_port, ::testing::MatchesRegex("^COM\\d+$"));
     EXPECT_GT(serial_port.id_product, 0);
