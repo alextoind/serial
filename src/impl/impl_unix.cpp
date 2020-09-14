@@ -180,25 +180,25 @@ void Serial::SerialImpl::reconfigurePort() {
     case 4800: baudrate = B4800; break;
 #endif
 #ifdef B7200
-      case 7200: baudrate = B7200; break;
+    case 7200: baudrate = B7200; break;
 #endif
 #ifdef B9600
     case 9600: baudrate = B9600; break;
 #endif
 #ifdef B14400
-      case 14400: baudrate = B14400; break;
+    case 14400: baudrate = B14400; break;
 #endif
 #ifdef B19200
     case 19200: baudrate = B19200; break;
 #endif
 #ifdef B28800
-      case 28800: baudrate = B28800; break;
+    case 28800: baudrate = B28800; break;
 #endif
 #ifdef B57600
     case 57600: baudrate = B57600; break;
 #endif
 #ifdef B76800
-      case 76800: baudrate = B76800; break;
+    case 76800: baudrate = B76800; break;
 #endif
 #ifdef B38400
     case 38400: baudrate = B38400; break;
@@ -207,16 +207,16 @@ void Serial::SerialImpl::reconfigurePort() {
     case 115200: baudrate = B115200; break;
 #endif
 #ifdef B128000
-      case 128000: baudrate = B128000; break;
+    case 128000: baudrate = B128000; break;
 #endif
 #ifdef B153600
-      case 153600: baudrate = B153600; break;
+    case 153600: baudrate = B153600; break;
 #endif
 #ifdef B230400
     case 230400: baudrate = B230400; break;
 #endif
 #ifdef B256000
-      case 256000: baudrate = B256000; break;
+    case 256000: baudrate = B256000; break;
 #endif
 #ifdef B460800
     case 460800: baudrate = B460800; break;
@@ -376,10 +376,16 @@ bool waitOnPoll(std::chrono::milliseconds timeout_ms, std::unique_ptr<pollfd> fd
 }
 
 bool Serial::SerialImpl::waitReadable(std::chrono::milliseconds timeout_ms) const {
+  if (!is_open_) {
+    throw SerialPortNotOpenException();
+  }
   return waitOnPoll(timeout_ms, std::unique_ptr<pollfd>(new pollfd{fd_, POLLIN, 0}));
 }
 
 bool Serial::SerialImpl::waitWritable(std::chrono::milliseconds timeout_ms) const {
+  if (!is_open_) {
+    throw SerialPortNotOpenException();
+  }
   return waitOnPoll(timeout_ms, std::unique_ptr<pollfd>(new pollfd{fd_, POLLOUT, 0}));
 }
 
@@ -455,7 +461,7 @@ std::string Serial::SerialImpl::getPort() const {
   return port_;
 }
 
-void Serial::SerialImpl::setTimeout(Serial::Timeout &timeout) {
+void Serial::SerialImpl::setTimeout(const Timeout &timeout) {
   timeout_ = timeout;  // timeout is used directly inside read() and write(): there is no need to call reconfigurePort()
 }
 

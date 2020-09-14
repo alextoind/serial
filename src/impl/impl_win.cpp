@@ -213,7 +213,7 @@ std::string Serial::SerialImpl::getPort() const {
   return port_;
 }
 
-void Serial::SerialImpl::setTimeout(Serial::Timeout &timeout) {
+void Serial::SerialImpl::setTimeout(const Timeout &timeout) {
   timeout_ = timeout;
   if (is_open_) {
     reconfigurePort();
