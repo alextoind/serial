@@ -24,9 +24,9 @@
 
 using namespace serial;
 
-Serial::Serial(const std::string &port, uint32_t baudrate, Serial::Timeout timeout, bytesize_t bytesize, parity_t parity,
+Serial::Serial(const std::string &port_name, uint32_t baudrate, Serial::Timeout timeout, bytesize_t bytesize, parity_t parity,
                stopbits_t stopbits, flowcontrol_t flowcontrol)
-    : pimpl_(new SerialImpl(port, baudrate, timeout, bytesize, parity, stopbits, flowcontrol)) {
+    : pimpl_(new SerialImpl(port_name, baudrate, timeout, bytesize, parity, stopbits, flowcontrol)) {
 
 }
 
@@ -146,14 +146,14 @@ size_t Serial::write(const uint8_t *data, size_t size) {
   return pimpl_->write(data, size);
 }
 
-void Serial::setPort(const std::string &port) {
+void Serial::setPort(const std::string &port_name) {
   std::lock_guard<std::mutex> read_lock(read_mutex_);
   std::lock_guard<std::mutex> write_lock(write_mutex_);
   bool was_open = pimpl_->isOpen();
   if (was_open) {
     close();
   }
-  pimpl_->setPort(port);
+  pimpl_->setPort(port_name);
   if (was_open) {
     open();
   }
@@ -163,8 +163,12 @@ std::string Serial::getPort() const {
   return pimpl_->getPort();
 }
 
-void Serial::setTimeout(Serial::Timeout &timeout) {
+void Serial::setTimeout(const Timeout &timeout) {
   pimpl_->setTimeout(timeout);
+}
+
+void Serial::setTimeout(uint32_t inter_byte, uint32_t read_constant, uint32_t read_multiplier, uint32_t write_constant, uint32_t write_multiplier) {
+  setTimeout(Timeout(inter_byte, read_constant, read_multiplier, write_constant, write_multiplier));
 }
 
 Serial::Timeout Serial::getTimeout() const {

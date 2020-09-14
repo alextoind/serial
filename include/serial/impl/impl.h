@@ -123,7 +123,7 @@ class Serial::SerialImpl {
 
   std::string getPort() const;
 
-  void setTimeout(Timeout &timeout);
+  void setTimeout(const Timeout &timeout);
 
   Timeout getTimeout() const;
 
